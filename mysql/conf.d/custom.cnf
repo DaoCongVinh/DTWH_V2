@@ -1,8 +1,0 @@
-[mysqld]
-# Replace deprecated --skip-host-cache
-host_cache_size=0
-
-# Move pid-file to a directory owned by mysql to avoid warning
-pid-file=/var/lib/mysql/mysqld.pid
-
-
