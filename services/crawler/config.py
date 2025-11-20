@@ -41,3 +41,8 @@ SOURCE_URL = cfg.get("source", {}).get("url", "")
 
 # Ensure storage path exists
 os.makedirs(STORAGE_PATH, exist_ok=True)
+
+# Email Config
+MAIL_SENDER = os.getenv("MAIL_SENDER")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+MAIL_RECEIVER = os.getenv("MAIL_RECEIVER")
