@@ -1,5 +1,6 @@
 pymysql
 pyyaml
 python-dotenv
+cryptography
 
 

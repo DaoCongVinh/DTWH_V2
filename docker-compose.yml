@@ -31,6 +31,23 @@ services:
     networks:
       - tiktok_network
 
+  loader-staging:
+    build: ./services/loaderStaging
+    env_file: .env
+    environment:
+      MYSQL_DATABASE_STAGING: dbStaging
+      STORAGE_PATH: /data/storage
+      DATE_DIM_PATH: /app/date_dim.csv
+    volumes:
+      - ./storage:/data/storage:ro
+      - ./services/loaderStaging/date_dim.csv:/app/date_dim.csv:ro
+      - ./config.yml:/app/config.yml:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tiktok_network
+
 networks:
   tiktok_network:
 
