@@ -2,6 +2,7 @@ CREATE DATABASE IF NOT EXISTS metadata_tiktok;
 CREATE DATABASE IF NOT EXISTS staging_tiktok;
 CREATE DATABASE IF NOT EXISTS warehouse_tiktok;
 CREATE DATABASE IF NOT EXISTS dbStaging;
+CREATE DATABASE IF NOT EXISTS dwh_tiktok;
 
 -- Create user and grant permissions
 CREATE USER IF NOT EXISTS 'user'@'%' IDENTIFIED BY 'dwhtiktok';
