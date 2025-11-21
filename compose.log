@@ -1,0 +1,334 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 989B done
+#1 DONE 0.0s
+
+#2 [loader-staging internal] load build definition from Dockerfile
+#2 transferring dockerfile: 368B done
+#2 DONE 0.0s
+
+#3 [crawler internal] load build definition from Dockerfile
+#3 transferring dockerfile: 365B done
+#3 DONE 0.0s
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [crawler internal] load metadata for docker.io/library/python:3.12-slim
+#5 DONE 1.7s
+
+#6 [crawler internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [loader-staging internal] load .dockerignore
+#7 transferring context: 2B done
+#7 DONE 0.0s
+
+#8 [crawler internal] load build context
+#8 transferring context: 285B done
+#8 DONE 0.0s
+
+#9 [crawler 1/5] FROM docker.io/library/python:3.12-slim@sha256:b43ff04d5df04ad5cabb80890b7ef74e8410e3395b19af970dcd52d7a4bff921
+#9 resolve docker.io/library/python:3.12-slim@sha256:b43ff04d5df04ad5cabb80890b7ef74e8410e3395b19af970dcd52d7a4bff921 0.0s done
+#9 DONE 0.0s
+
+#10 [loader-staging internal] load build context
+#10 transferring context: 50.48kB 0.0s done
+#10 DONE 0.0s
+
+#11 [crawler 3/5] COPY requirements.txt .
+#11 CACHED
+
+#12 [crawler 4/5] RUN apt-get update && apt-get install -y build-essential libssl-dev &&     pip install --no-cache-dir -r requirements.txt &&     pip install cryptography &&     apt-get clean && rm -rf /var/lib/apt/lists/*
+#12 CACHED
+
+#13 [crawler 5/5] COPY . .
+#13 CACHED
+
+#14 [loader-staging 2/5] WORKDIR /app
+#14 CACHED
+
+#15 [loader-staging 3/5] COPY requirements.txt .
+#15 CACHED
+
+#16 [loader-staging 4/5] RUN apt-get update && apt-get install -y build-essential libssl-dev     && pip install --no-cache-dir -r requirements.txt     && apt-get clean && rm -rf /var/lib/apt/lists/*
+#16 CACHED
+
+#17 [crawler] exporting to image
+#17 exporting layers done
+#17 exporting manifest sha256:973a1f9bfd7818cb2a69386eadd934dd139e5b723eb4696d4df103056f6d01f8 done
+#17 exporting config sha256:968e3945880fa23c779c6588988449dbdb5266a3f3fb4557496dcdd8c3791f18 done
+#17 exporting attestation manifest sha256:1e8409daa512e4eab324465dcc08115ed4acdb9f44c84194ec853f0c618b90d2 0.0s done
+#17 exporting manifest list sha256:8091bbad84c13f1736744942819f8681969a3fce51878e7ccfac1e9ecdf36b42
+#17 exporting manifest list sha256:8091bbad84c13f1736744942819f8681969a3fce51878e7ccfac1e9ecdf36b42 0.0s done
+#17 naming to docker.io/library/dtwh_v2-crawler:latest done
+#17 unpacking to docker.io/library/dtwh_v2-crawler:latest done
+#17 DONE 0.1s
+
+#18 [loader-staging 5/5] COPY loader.py loader.sql date_dim.csv ./
+#18 DONE 0.1s
+
+#19 [loader-staging] exporting to image
+#19 exporting layers 0.1s done
+#19 ...
+
+#20 [crawler] resolving provenance for metadata file
+#20 DONE 0.0s
+
+#19 [loader-staging] exporting to image
+#19 exporting manifest sha256:34f3df7ccba76bb8ae0da5282d806049910ea5e0d4687ca512f60661ef4cf362 0.0s done
+#19 exporting config sha256:46a37c5badc90f7cff067d145d79985465e1b8b8c670d89a201fc1d8d58e0731 0.0s done
+#19 exporting attestation manifest sha256:9983f6fb76c4a8641d20c0209b0b708c519ab616a8b5d8d7801effb8f7056511 0.0s done
+#19 exporting manifest list sha256:e3fc154167e8a22933c23a2b94c08bb3b1e9ef1c48772c561270f178c5da9e60 0.0s done
+#19 naming to docker.io/library/dtwh_v2-loader-staging:latest done
+#19 unpacking to docker.io/library/dtwh_v2-loader-staging:latest 0.0s done
+#19 DONE 0.2s
+
+#21 [loader-staging] resolving provenance for metadata file
+#21 DONE 0.0s
+ dtwh_v2-loader-staging  Built
+ dtwh_v2-crawler  Built
+ Network dtwh_v2_tiktok_network  Creating
+ Network dtwh_v2_tiktok_network  Created
+ Volume "dtwh_v2_db_data"  Creating
+ Volume "dtwh_v2_db_data"  Created
+ Container dtwh_v2-db-1  Creating
+ Container dtwh_v2-db-1  Created
+ Container dtwh_v2-loader-staging-1  Creating
+ Container dtwh_v2-crawler-1  Creating
+ Container dtwh_v2-crawler-1  Created
+ Container dtwh_v2-loader-staging-1  Created
+Attaching to crawler-1, db-1, loader-staging-1
+db-1  | 2025-11-21 16:52:35+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.44-1.el9 started.
+db-1  | 2025-11-21 16:52:35+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'
+db-1  | 2025-11-21 16:52:35+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.44-1.el9 started.
+db-1  | 2025-11-21 16:52:35+00:00 [Note] [Entrypoint]: Initializing database files
+db-1  | 2025-11-21T16:52:35.409760Z 0 [Warning] [MY-011068] [Server] The syntax '--skip-host-cache' is deprecated and will be removed in a future release. Please use SET GLOBAL host_cache_size=0 instead.
+db-1  | 2025-11-21T16:52:35.409837Z 0 [System] [MY-013169] [Server] /usr/sbin/mysqld (mysqld 8.0.44) initializing of server in progress as process 80
+db-1  | 2025-11-21T16:52:35.415399Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+db-1  | 2025-11-21T16:52:35.893572Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+db-1  | 2025-11-21T16:52:37.094123Z 6 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.
+db-1  | 2025-11-21 16:52:40+00:00 [Note] [Entrypoint]: Database files initialized
+db-1  | 2025-11-21 16:52:40+00:00 [Note] [Entrypoint]: Starting temporary server
+db-1  | 2025-11-21T16:52:40.774341Z 0 [Warning] [MY-011068] [Server] The syntax '--skip-host-cache' is deprecated and will be removed in a future release. Please use SET GLOBAL host_cache_size=0 instead.
+db-1  | 2025-11-21T16:52:40.776209Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.0.44) starting as process 124
+db-1  | 2025-11-21T16:52:40.789430Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+db-1  | 2025-11-21T16:52:40.984042Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+db-1  | 2025-11-21T16:52:41.215963Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+db-1  | 2025-11-21T16:52:41.216011Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+db-1  | 2025-11-21T16:52:41.218728Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.
+db-1  | 2025-11-21T16:52:41.234116Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Socket: /var/run/mysqld/mysqlx.sock
+db-1  | 2025-11-21T16:52:41.234205Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.0.44'  socket: '/var/run/mysqld/mysqld.sock'  port: 0  MySQL Community Server - GPL.
+db-1  | 2025-11-21 16:52:41+00:00 [Note] [Entrypoint]: Temporary server started.
+db-1  | '/var/lib/mysql/mysql.sock' -> '/var/run/mysqld/mysqld.sock'
+db-1  | Warning: Unable to load '/usr/share/zoneinfo/iso3166.tab' as time zone. Skipping it.
+db-1  | Warning: Unable to load '/usr/share/zoneinfo/leap-seconds.list' as time zone. Skipping it.
+db-1  | Warning: Unable to load '/usr/share/zoneinfo/leapseconds' as time zone. Skipping it.
+db-1  | Warning: Unable to load '/usr/share/zoneinfo/tzdata.zi' as time zone. Skipping it.
+db-1  | Warning: Unable to load '/usr/share/zoneinfo/zone.tab' as time zone. Skipping it.
+db-1  | Warning: Unable to load '/usr/share/zoneinfo/zone1970.tab' as time zone. Skipping it.
+db-1  | 2025-11-21 16:52:42+00:00 [Note] [Entrypoint]: Creating database dwh_tiktok
+db-1  | 2025-11-21 16:52:42+00:00 [Note] [Entrypoint]: Creating user user
+db-1  | 2025-11-21 16:52:42+00:00 [Note] [Entrypoint]: Giving user user access to schema dwh_tiktok
+db-1  | 
+db-1  | 2025-11-21 16:52:42+00:00 [Note] [Entrypoint]: /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/01_create_requested_user.sql
+db-1  | 
+db-1  | 
+db-1  | 2025-11-21 16:52:42+00:00 [Note] [Entrypoint]: /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/02_create_dbstaging_tables.sql
+db-1  | 
+db-1  | 
+db-1  | 2025-11-21 16:52:43+00:00 [Note] [Entrypoint]: /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/schema.sql
+db-1  | 2025-11-21T16:52:43.167435Z 15 [Warning] [MY-010235] [Server] Following users were specified in CREATE USER IF NOT EXISTS but they already exist. Corresponding entry in binary log used default authentication plugin 'caching_sha2_password' to rewrite authentication information (if any) for them: 'user'@'%'
+db-1  | 
+db-1  | 
+db-1  | 2025-11-21 16:52:43+00:00 [Note] [Entrypoint]: Stopping temporary server
+db-1  | 2025-11-21T16:52:43.545002Z 16 [System] [MY-013172] [Server] Received SHUTDOWN from user root. Shutting down mysqld (Version: 8.0.44).
+db-1  | 2025-11-21T16:52:45.195456Z 0 [System] [MY-010910] [Server] /usr/sbin/mysqld: Shutdown complete (mysqld 8.0.44)  MySQL Community Server - GPL.
+db-1  | 2025-11-21 16:52:45+00:00 [Note] [Entrypoint]: Temporary server stopped
+db-1  | 
+db-1  | 2025-11-21 16:52:45+00:00 [Note] [Entrypoint]: MySQL init process done. Ready for start up.
+db-1  | 
+db-1  | 2025-11-21T16:52:45.752286Z 0 [Warning] [MY-011068] [Server] The syntax '--skip-host-cache' is deprecated and will be removed in a future release. Please use SET GLOBAL host_cache_size=0 instead.
+db-1  | 2025-11-21T16:52:45.753430Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.0.44) starting as process 1
+db-1  | 2025-11-21T16:52:45.759529Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+db-1  | 2025-11-21T16:52:45.931139Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.
+db-1  | 2025-11-21T16:52:46.113515Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+db-1  | 2025-11-21T16:52:46.113566Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.
+db-1  | 2025-11-21T16:52:46.116068Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.
+db-1  | 2025-11-21T16:52:46.131126Z 0 [System] [MY-011323] [Server] X Plugin ready for connections. Bind-address: '::' port: 33060, socket: /var/run/mysqld/mysqlx.sock
+db-1  | 2025-11-21T16:52:46.131313Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.0.44'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server - GPL.
+loader-staging-1  | Warning: Error executing statement: CREATE PROCEDURE insert_load_log(
+loader-staging-1  |     IN p_batch_id VARCHAR(128),
+loader-staging-1  |     IN p_table_name VARCHAR(128),
+loader-staging-1  | ... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 21")
+loader-staging-1  | Warning: Error executing statement: END... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END' at line 1")
+loader-staging-1  | Warning: Error executing statement: CREATE PROCEDURE process_raw_record(
+loader-staging-1  |     IN p_filename VARCHAR(512),
+loader-staging-1  |     IN p_payload JSON,
+loader-staging-1  |     IN p... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 7")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_author_id VARCHAR(128)... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_author_id VARCHAR(128)' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_author_name VARCHAR(255)... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_author_name VARCHAR(255)' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_avatar TEXT... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_avatar TEXT' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_text TEXT... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_text TEXT' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_duration INT DEFAULT 0... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_duration INT DEFAULT 0' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_create_time DATETIME... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_create_time DATETIME' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_date_sk INT... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_date_sk INT' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_web_url TEXT... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_web_url TEXT' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_digg BIGINT DEFAULT 0... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_digg BIGINT DEFAULT 0' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_play BIGINT DEFAULT 0... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_play BIGINT DEFAULT 0' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_share BIGINT DEFAULT 0... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_share BIGINT DEFAULT 0' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_comment BIGINT DEFAULT 0... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_comment BIGINT DEFAULT 0' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_collect BIGINT DEFAULT 0... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_collect BIGINT DEFAULT 0' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_raw_ts VARCHAR(128)... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_raw_ts VARCHAR(128)' at line 1")
+loader-staging-1  | Warning: Error executing statement: proc_block: BEGIN
+loader-staging-1  |         SET v_video_id = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'proc_block: BEGIN\n        SET v_video_id = COALESCE(\n            JSON_UNQUOTE(JS' at line 1")
+loader-staging-1  | Warning: Error executing statement: IF v_video_id IS NULL OR v_video_id = '' THEN
+loader-staging-1  |             LEAVE proc_block... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF v_video_id IS NULL OR v_video_id = '' THEN\n            LEAVE proc_block' at line 1")
+loader-staging-1  | Warning: Error executing statement: END IF... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END IF' at line 1")
+loader-staging-1  | Warning: Error executing statement: SET v_author_id = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.authorMeta.id')),
+loader-staging-1  |   ... Error: (1193, "Unknown system variable 'v_author_id'")
+loader-staging-1  | Warning: Error executing statement: SET v_author_name = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.authorMeta.name'))... Error: (1193, "Unknown system variable 'v_author_name'")
+loader-staging-1  | Warning: Error executing statement: SET v_avatar = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.authorMeta.avatar')),
+loader-staging-1  |  ... Error: (1193, "Unknown system variable 'v_avatar'")
+loader-staging-1  | Warning: Error executing statement: SET v_text = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.text')),
+loader-staging-1  |             JSON... Error: (1193, "Unknown system variable 'v_text'")
+loader-staging-1  | Warning: Error executing statement: SET v_duration = COALESCE(
+loader-staging-1  |             CAST(JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.duration')) AS U... Error: (1193, "Unknown system variable 'v_duration'")
+loader-staging-1  | Warning: Error executing statement: SET v_raw_ts = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.createTime')),
+loader-staging-1  |         ... Error: (1193, "Unknown system variable 'v_raw_ts'")
+loader-staging-1  | Warning: Error executing statement: IF v_raw_ts IS NOT NULL AND v_raw_ts <> '' THEN
+loader-staging-1  |             SET v_raw_ts = REPLACE(REPLACE(v_raw_ts,... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF v_raw_ts IS NOT NULL AND v_raw_ts <> '' THEN\n            SET v_raw_ts = REPLA' at line 1")
+loader-staging-1  | Warning: Error executing statement: IF v_raw_ts REGEXP '^[0-9]+$' THEN
+loader-staging-1  |                 SET v_create_time = FROM_UNIXTIME(CAST(v_raw_ts A... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF v_raw_ts REGEXP '^[0-9]+$' THEN\n                SET v_create_time = FROM_UNIX' at line 1")
+loader-staging-1  | Warning: Error executing statement: ELSE
+loader-staging-1  |                 SET v_create_time = STR_TO_DATE(v_raw_ts, '%Y-%m-%d %H:%i:%s')... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ELSE\n                SET v_create_time = STR_TO_DATE(v_raw_ts, '%Y-%m-%d %H:%i:%' at line 1")
+loader-staging-1  | Warning: Error executing statement: IF v_create_time IS NULL THEN
+loader-staging-1  |                     SET v_create_time = STR_TO_DATE(SUBSTRING(v_raw_ts... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF v_create_time IS NULL THEN\n                    SET v_create_time = STR_TO_DAT' at line 1")
+loader-staging-1  | Warning: Error executing statement: END IF... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END IF' at line 1")
+loader-staging-1  | Warning: Error executing statement: END IF... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END IF' at line 1")
+loader-staging-1  | Warning: Error executing statement: END IF... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END IF' at line 1")
+loader-staging-1  | Warning: Error executing statement: IF v_create_time IS NOT NULL THEN
+loader-staging-1  |             SELECT date_sk INTO v_date_sk
+loader-staging-1  |             FROM DateDim... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF v_create_time IS NOT NULL THEN\n            SELECT date_sk INTO v_date_sk\n    ' at line 1")
+loader-staging-1  | Warning: Error executing statement: END IF... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END IF' at line 1")
+loader-staging-1  | Warning: Error executing statement: SET v_web_url = COALESCE(
+loader-staging-1  |             JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.webVideoUrl')),
+loader-staging-1  |       ... Error: (1193, "Unknown system variable 'v_web_url'")
+loader-staging-1  | Warning: Error executing statement: SET v_digg = COALESCE(
+loader-staging-1  |             CAST(JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.diggCount')) AS UNSI... Error: (1193, "Unknown system variable 'v_digg'")
+loader-staging-1  | Warning: Error executing statement: SET v_play = COALESCE(
+loader-staging-1  |             CAST(JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.playCount')) AS UNSI... Error: (1193, "Unknown system variable 'v_play'")
+loader-staging-1  | Warning: Error executing statement: SET v_share = COALESCE(
+loader-staging-1  |             CAST(JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.shareCount')) AS UN... Error: (1193, "Unknown system variable 'v_share'")
+loader-staging-1  | Warning: Error executing statement: SET v_comment = COALESCE(
+loader-staging-1  |             CAST(JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.commentCount')) A... Error: (1193, "Unknown system variable 'v_comment'")
+loader-staging-1  | Warning: Error executing statement: SET v_collect = COALESCE(
+loader-staging-1  |             CAST(JSON_UNQUOTE(JSON_EXTRACT(p_payload, '$.collectCount')) A... Error: (1193, "Unknown system variable 'v_collect'")
+loader-staging-1  | Warning: Error executing statement: INSERT INTO RawJson (filename, content, load_status, source_line)
+loader-staging-1  |         VALUES (p_filename, p_payl... Error: (1054, "Unknown column 'p_filename' in 'field list'")
+loader-staging-1  | Warning: Error executing statement: IF v_author_id IS NOT NULL AND v_author_id <> '' THEN
+loader-staging-1  |             INSERT INTO Authors (authorID, Nam... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF v_author_id IS NOT NULL AND v_author_id <> '' THEN\n            INSERT INTO Au' at line 1")
+loader-staging-1  | Warning: Error executing statement: END IF... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END IF' at line 1")
+loader-staging-1  | Warning: Error executing statement: INSERT INTO Videos (
+loader-staging-1  |             videoID, authorID, TextContent, Duration, CreateTime, WebVideoUrl, ... Error: (1054, "Unknown column 'v_video_id' in 'field list'")
+loader-staging-1  | Warning: Error executing statement: INSERT INTO VideoInteractions (
+loader-staging-1  |             videoID, DiggCount, PlayCount, ShareCount, CommentCount,... Error: (1054, "Unknown column 'v_video_id' in 'field list'")
+loader-staging-1  | Warning: Error executing statement: END proc_block... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END proc_block' at line 1")
+loader-staging-1  | Warning: Error executing statement: END... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END' at line 1")
+loader-staging-1  | Warning: Error executing statement: CREATE PROCEDURE load_date_dim_from_csv(
+loader-staging-1  |     IN p_csv_path VARCHAR(512)
+loader-staging-1  | )
+loader-staging-1  | BEGIN
+loader-staging-1  |     DECLARE v_sql TE... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 5")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_escaped VARCHAR(1024)... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_escaped VARCHAR(1024)' at line 1")
+loader-staging-1  | Warning: Error executing statement: DECLARE v_batch VARCHAR(64)... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE v_batch VARCHAR(64)' at line 1")
+loader-staging-1  | Warning: Error executing statement: SET v_batch = CONCAT('date_dim_load_', DATE_FORMAT(NOW(), '%Y%m%d_%H%i%s'))... Error: (1193, "Unknown system variable 'v_batch'")
+loader-staging-1  | Warning: Error executing statement: SET v_escaped = REPLACE(p_csv_path, '\\', '\\\\')... Error: (1193, "Unknown system variable 'v_escaped'")
+loader-staging-1  | Warning: Error executing statement: SET v_sql = CONCAT(
+loader-staging-1  |         "LOAD DATA LOCAL INFILE '",
+loader-staging-1  |         v_escaped,
+loader-staging-1  |         "' INTO TABLE Dat... Error: (1193, "Unknown system variable 'v_sql'")
+loader-staging-1  | Warning: Error executing statement: PREPARE stmt FROM v_sql... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'v_sql' at line 1")
+loader-staging-1  | Warning: Error executing statement: EXECUTE stmt... Error: (1243, 'Unknown prepared statement handler (stmt) given to EXECUTE')
+loader-staging-1  | Warning: Error executing statement: DEALLOCATE PREPARE stmt... Error: (1243, 'Unknown prepared statement handler (stmt) given to DEALLOCATE PREPARE')
+loader-staging-1  | Warning: Error executing statement: INSERT INTO DateDim (
+loader-staging-1  |         date_sk, full_date, day_since_2005, month_since_2005,
+loader-staging-1  |         day_of_w... Error: (1054, "Unknown column 'quarter' in 'field list'")
+loader-staging-1  | Warning: Error executing statement: CALL insert_load_log(v_batch, 'DateDim', 'UPSERT', (SELECT COUNT(*) FROM DateDimStaging), 'success',... Error: (1305, 'PROCEDURE dbStaging.insert_load_log does not exist')
+loader-staging-1  | Warning: Error executing statement: END... Error: (1064, "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'END' at line 1")
+loader-staging-1  | Γ£à Schema + procedures ready.
+loader-staging-1  | Γ¥î device-unknown_run_12112025T102337Z.json:1 -> (1305, 'PROCEDURE dbStaging.process_raw_record does not exist')
+loader-staging-1  | Γ¥î device-unknown_run_12112025T102605Z.json:1 -> (1305, 'PROCEDURE dbStaging.process_raw_record does not exist')
+loader-staging-1  | Γ¥î device-unknown_run_20112025T131655Z.json:1 -> (1305, 'PROCEDURE dbStaging.process_raw_record does not exist')
+loader-staging-1  | Γ¥î device-unknown_run_20112025T134408Z.json:1 -> (1305, 'PROCEDURE dbStaging.process_raw_record does not exist')
+loader-staging-1  | Γ¥î device-unknown_run_21112025T165111Z.json:1 -> (1305, 'PROCEDURE dbStaging.process_raw_record does not exist')
+loader-staging-1  | Γ¥î device-unknown_run_30102025T023930Z.json:1 -> (1305, 'PROCEDURE dbStaging.process_raw_record does not exist')
+loader-staging-1  | Traceback (most recent call last):
+loader-staging-1  |   File "/app/loader.py", line 110, in <module>
+loader-staging-1  |     run_pipeline()
+loader-staging-1  |   File "/app/loader.py", line 87, in run_pipeline
+loader-staging-1  |     cur.callproc(
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/cursors.py", line 269, in callproc
+loader-staging-1  |     self._query(q)
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/cursors.py", line 322, in _query
+loader-staging-1  |     conn.query(q)
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/connections.py", line 575, in query
+loader-staging-1  |     self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+loader-staging-1  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/connections.py", line 826, in _read_query_result
+loader-staging-1  |     result.read()
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/connections.py", line 1203, in read
+loader-staging-1  |     first_packet = self.connection._read_packet()
+loader-staging-1  |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/connections.py", line 782, in _read_packet
+loader-staging-1  |     packet.raise_for_error()
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/protocol.py", line 219, in raise_for_error
+loader-staging-1  |     err.raise_mysql_exception(self._data)
+loader-staging-1  |   File "/usr/local/lib/python3.12/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
+loader-staging-1  |     raise errorclass(errno, errval)
+loader-staging-1  | pymysql.err.OperationalError: (1305, 'PROCEDURE dbStaging.insert_load_log does not exist')
+crawler-1         | 2025-11-21 16:52:56,304 - INFO - Scheduler disabled or no cron expression; running once.
+crawler-1         | 2025-11-21 16:52:56,304 - INFO - Job started for device device-unknown
+crawler-1         | 2025-11-21 16:52:56,315 - INFO - Calling Apify actor: GdWCkxBtKWOsKjdch
+
+[Kloader-staging-1 exited with code 1
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> Status: RUNNING, Message: 
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:52:58.771Z ACTOR: Pulling container image of build tSYT1F9Ve8ZomN7ZM from registry.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:52:58.774Z ACTOR: Creating container.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:52:58.863Z ACTOR: Starting container.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:52:59.090Z Will run command: xvfb-run -a -s "-ac -screen 0 1920x1080x24+32 -nolisten tcp" /bin/sh -c ./start_xvfb_and_run_cmd.sh && npm run start:prod --silent
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:00.341Z INFO  System info {"apifyVersion":"3.4.2","apifyClientVersion":"2.12.6","crawleeVersion":"3.13.9","osType":"Linux","nodeVersion":"v20.19.5"}
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> Status: RUNNING, Message: Starting the crawler.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:01.733Z INFO  CheerioCrawler: Starting the crawler.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:04.836Z INFO  [HASHTAG_CONTINUATION] Scraped 30 videos --- https://www.tiktok.com/tag/fyp
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:04.972Z INFO  [HASHTAG_CONTINUATION] Scraped 27 videos --- https://www.tiktok.com/tag/fyp
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:05.802Z INFO  [HASHTAG_CONTINUATION] Scraped 30 videos --- https://www.tiktok.com/tag/fyp
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:05.949Z INFO  [HASHTAG_CONTINUATION] Scraped 30 videos --- https://www.tiktok.com/tag/fyp
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> Status: RUNNING, Message: Scraped 1/1 hashtags
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> Status: RUNNING, Message: Crawled 5/6 pages, 0 failed requests, desired concurrency 10.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:11.623Z INFO  [Status message]: Scraped 1/1 hashtags
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:17.590Z INFO  [HASHTAG_CONTINUATION] Scraped 27 videos --- https://www.tiktok.com/tag/fyp
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:17.592Z INFO  [HASHTAG_CONTINUATION] No more videos to scrape. --- https://www.tiktok.com/tag/fyp
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:17.696Z INFO  CheerioCrawler: All requests from the queue have been processed, the crawler will shut down.
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:17.961Z INFO  CheerioCrawler: Final request statistics: {"requestsFinished":6,"requestsFailed":0,"retryHistogram":[6],"requestAvgFailedDurationMillis":null,"requestAvgFinishedDurationMillis":4088,"requestsFinishedPerMinute":22,"requestsFailedPerMinute":0,"requestTotalDurationMillis":24529,"requestsTotal":6,"crawlerRuntimeMillis":16441}
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:17.962Z INFO  CheerioCrawler: Finished! Total 6 requests: 6 succeeded, 0 failed. {"terminal":true}
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:17.992Z INFO  [Status message]: Scraped 1/1 hashtags
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> Status: RUNNING, Message: Scraped 1/1 hashtags
+crawler-1         | [apify.tiktok-scraper runId:hgsg2dB5lqyeqSCda] -> 2025-11-21T16:53:18.167Z INFO  [Status message]: Scraped 1/1 hashtags
+crawler-1         | 2025-11-21 16:53:24,598 - INFO - Fetching results from dataset: BgpQpkozzGawzNOP2
+crawler-1         | 2025-11-21 16:53:24,928 - WARNING - Email config missing. Skipping email notification.
+crawler-1         | 2025-11-21 16:53:24,928 - INFO - Job finished successfully.
+
+[Kcrawler-1 exited with code 0
+Gracefully Stopping... press Ctrl+C again to force
+ Container dtwh_v2-loader-staging-1  Stopping
+ Container dtwh_v2-crawler-1  Stopping
+ Container dtwh_v2-loader-staging-1  Stopped
+ Container dtwh_v2-crawler-1  Stopped
+ Container dtwh_v2-db-1  Stopping
