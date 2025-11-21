@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS DateDim (
     year_week_monday VARCHAR(20),
     week_monday_start VARCHAR(20),
     quarter INT,
+    quarter_raw VARCHAR(20),
     month_num INT,
     holiday VARCHAR(50),
     day_type VARCHAR(20),
@@ -335,12 +336,21 @@ BEGIN
     DECLARE v_sql TEXT;
     DECLARE v_escaped VARCHAR(1024);
     DECLARE v_batch VARCHAR(64);
+    DECLARE v_col_count INT DEFAULT 0;
 
     SET v_batch = CONCAT('date_dim_load_', DATE_FORMAT(NOW(), '%Y%m%d_%H%i%s'));
     TRUNCATE TABLE DateDimStaging;
     
-    -- Add temporary quarter_raw column to handle string quarters
-    ALTER TABLE DateDimStaging ADD COLUMN IF NOT EXISTS quarter_raw VARCHAR(20) AFTER quarter;
+    -- Check if quarter_raw column exists, add if not
+    SELECT COUNT(*) INTO v_col_count
+    FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'DateDimStaging' 
+      AND COLUMN_NAME = 'quarter_raw';
+    
+    IF v_col_count = 0 THEN
+        ALTER TABLE DateDimStaging ADD COLUMN quarter_raw VARCHAR(20) AFTER quarter;
+    END IF;
     
     SET v_escaped = REPLACE(p_csv_path, '\\', '\\\\');
     SET v_sql = CONCAT(
@@ -370,14 +380,14 @@ BEGIN
         day_of_week, calendar_month, calendar_year, calendar_year_month,
         day_of_month, day_of_year, week_of_year_sunday, year_week_sunday,
         week_sunday_start, week_of_year_monday, year_week_monday,
-        week_monday_start, quarter, month_num, holiday, day_type
+        week_monday_start, quarter, quarter_raw, month_num, holiday, day_type
     )
     SELECT
         date_sk, full_date, day_since_2005, month_since_2005,
         day_of_week, calendar_month, calendar_year, calendar_year_month,
         day_of_month, day_of_year, week_of_year_sunday, year_week_sunday,
         week_sunday_start, week_of_year_monday, year_week_monday,
-        week_monday_start, quarter, month_num, holiday, day_type
+        week_monday_start, quarter, quarter_raw, month_num, holiday, day_type
     FROM DateDimStaging
     ON DUPLICATE KEY UPDATE
         full_date = VALUES(full_date),
@@ -396,12 +406,21 @@ BEGIN
         year_week_monday = VALUES(year_week_monday),
         week_monday_start = VALUES(week_monday_start),
         quarter = VALUES(quarter),
+        quarter_raw = VALUES(quarter_raw),
         month_num = VALUES(month_num),
         holiday = VALUES(holiday),
         day_type = VALUES(day_type);
         
-    -- Clean up temporary column
-    ALTER TABLE DateDimStaging DROP COLUMN IF EXISTS quarter_raw;
+    -- Clean up temporary column from staging only
+    SELECT COUNT(*) INTO v_col_count
+    FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+      AND TABLE_NAME = 'DateDimStaging' 
+      AND COLUMN_NAME = 'quarter_raw';
+    
+    IF v_col_count > 0 THEN
+        ALTER TABLE DateDimStaging DROP COLUMN quarter_raw;
+    END IF;
 
     CALL insert_load_log(v_batch, 'DateDim', 'UPSERT', (SELECT COUNT(*) FROM DateDimStaging), 'success', NULL);
 END;
