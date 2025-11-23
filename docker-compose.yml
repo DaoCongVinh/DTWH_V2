@@ -31,6 +31,7 @@ services:
       MYSQL_USER: ${CRAWLER_DB_USER}
       MYSQL_PASSWORD: ${CRAWLER_DB_PASSWORD}
       MYSQL_DATABASE: ${CRAWLER_DATABASE}
+      STORAGE_PATH: /data/storage
       TZ: Asia/Ho_Chi_Minh
     volumes:
       - ./storage:/data/storage
@@ -60,6 +61,22 @@ services:
     volumes:
       - ./storage:/data/storage
       - ./services/loaderStaging/date_dim.csv:/app/date_dim.csv:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tiktok_network
+
+  etl:
+    build: ./services/transformer
+    container_name: dtwh_v2-etl
+    restart: always
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+      MYSQL_ROOT_USER: ${MYSQL_ROOT_USER}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DB_WAREHOUSE: warehouse_tiktok
     depends_on:
       db:
         condition: service_healthy
