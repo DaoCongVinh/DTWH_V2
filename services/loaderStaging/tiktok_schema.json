@@ -1,0 +1,192 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TikTok Video Data Schema",
+  "description": "JSON Schema for validating TikTok video data from APIFY crawler",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "text",
+      "createTime",
+      "authorMeta",
+      "videoMeta",
+      "webVideoUrl"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Video ID",
+        "minLength": 1
+      },
+      "text": {
+        "type": "string",
+        "description": "Video caption/text content"
+      },
+      "textLanguage": {
+        "type": "string",
+        "description": "Language of video text"
+      },
+      "createTime": {
+        "type": "integer",
+        "description": "Unix timestamp when video was created",
+        "minimum": 0
+      },
+      "createTimeISO": {
+        "type": "string",
+        "description": "ISO format creation time"
+      },
+      "isAd": {
+        "type": "boolean",
+        "description": "Is this an advertisement"
+      },
+      "authorMeta": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Author/User ID",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Author username",
+            "minLength": 1
+          },
+          "nickName": {
+            "type": "string",
+            "description": "Author display name"
+          },
+          "avatar": {
+            "type": "string",
+            "description": "Avatar URL"
+          },
+          "originalAvatarUrl": {
+            "type": "string",
+            "description": "Original avatar URL"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "signature": {
+            "type": "string",
+            "description": "Author bio/signature"
+          },
+          "fans": {
+            "type": "integer",
+            "description": "Follower count",
+            "minimum": 0
+          },
+          "heart": {
+            "type": "integer",
+            "description": "Total likes received",
+            "minimum": 0
+          },
+          "video": {
+            "type": "integer",
+            "description": "Total video count",
+            "minimum": 0
+          },
+          "digg": {
+            "type": "integer",
+            "description": "Total likes given",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "videoMeta": {
+        "type": "object",
+        "properties": {
+          "height": {
+            "type": "integer",
+            "description": "Video height in pixels"
+          },
+          "width": {
+            "type": "integer",
+            "description": "Video width in pixels"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Video duration in seconds",
+            "minimum": 0
+          },
+          "coverUrl": {
+            "type": "string",
+            "description": "Cover/thumbnail URL"
+          },
+          "definition": {
+            "type": "string",
+            "description": "Video quality definition"
+          },
+          "format": {
+            "type": "string",
+            "description": "Video format"
+          }
+        },
+        "additionalProperties": true
+      },
+      "musicMeta": {
+        "type": "object",
+        "properties": {
+          "musicId": {
+            "type": "string"
+          },
+          "musicName": {
+            "type": "string"
+          },
+          "musicAuthor": {
+            "type": "string"
+          },
+          "musicOriginal": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": true
+      },
+      "webVideoUrl": {
+        "type": "string",
+        "description": "TikTok video URL",
+        "format": "uri"
+      },
+      "diggCount": {
+        "type": "integer",
+        "description": "Like/Digg count",
+        "minimum": 0
+      },
+      "shareCount": {
+        "type": "integer",
+        "description": "Share count",
+        "minimum": 0
+      },
+      "playCount": {
+        "type": "integer",
+        "description": "View/Play count",
+        "minimum": 0
+      },
+      "collectCount": {
+        "type": "integer",
+        "description": "Save/Collect count",
+        "minimum": 0
+      },
+      "commentCount": {
+        "type": "integer",
+        "description": "Comment count",
+        "minimum": 0
+      },
+      "hashtags": {
+        "type": "array",
+        "description": "Video hashtags"
+      },
+      "mentions": {
+        "type": "array",
+        "description": "Mentions in video"
+      }
+    },
+    "additionalProperties": true
+  },
+  "minItems": 1,
+  "maxItems": 1000,
+  "additionalItems": false
+}
