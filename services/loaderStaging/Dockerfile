@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y build-essential libssl-dev \
     && pip install --no-cache-dir -r requirements.txt \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY loader.py loader.sql date_dim.csv etl_processor.py test_etl.py ./
+COPY loader.py loader.sql date_dim.csv etl_processor_scd2.py manual_process_scd2.py check_status.py ./
 
 CMD ["python", "loader.py"]
 

@@ -2,12 +2,13 @@ import os
 import glob
 import json
 import csv
+import re
 from datetime import datetime
 
 import pymysql
 from pymysql import OperationalError
 from dotenv import load_dotenv
-from etl_processor import run_etl_pipeline
+from etl_processor_scd2 import run_etl_pipeline
 
 # Load environment
 load_dotenv()
@@ -164,11 +165,25 @@ def load_date_dim_fallback(conn, cur, csv_path: str):
     return {"loaded": loaded, "updated": updated, "skipped": skipped}
 
 
-def load_date_dim_with_proc_or_fallback(conn, cur, csv_path: str):
-    """Thử gọi thủ tục; nếu không tồn tại hoặc lỗi thì dùng fallback Python."""
+def load_date_dim_once_if_empty(conn, cur, csv_path: str):
+    """
+    Chỉ load DateDim một lần duy nhất nếu table còn trống
+    """
+    # Check if DateDim already has data
+    cur.execute("SELECT COUNT(*) AS cnt FROM DateDim")
+    existing_count = cur.fetchone()["cnt"]
+    
+    if existing_count > 0:
+        print(f"✅ DateDim đã có {existing_count} records. Bỏ qua việc load lại.")
+        return {"total_rows": existing_count, "loaded": 0, "updated": 0, "skipped": existing_count, "already_loaded": True}
+    
+    print("🔄 DateDim trống, bắt đầu load dữ liệu lần đầu...")
+    
+    # Try stored procedure first
     proc_name = "load_date_dim_from_csv"
     used_fallback = False
     result_info = {}
+    
     if procedure_exists(conn, proc_name):
         print("🚀 Gọi thủ tục load_date_dim_from_csv ...")
         try:
@@ -177,7 +192,7 @@ def load_date_dim_with_proc_or_fallback(conn, cur, csv_path: str):
             cur.execute("SELECT COUNT(*) AS cnt FROM DateDim")
             cnt = cur.fetchone()["cnt"]
             print(f"✅ Thủ tục chạy xong. Tổng dòng DateDim: {cnt}")
-            result_info = {"total_rows": cnt, "fallback": False}
+            result_info = {"total_rows": cnt, "fallback": False, "loaded": cnt, "updated": 0, "skipped": 0}
         except OperationalError as e:
             print(f"❌ Lỗi khi gọi thủ tục: {e}. Dùng fallback Python.")
             used_fallback = True
@@ -216,6 +231,8 @@ def load_date_dim_with_proc_or_fallback(conn, cur, csv_path: str):
             print("📝 Đã ghi log DateDim vào LoadLog.")
         except Exception as e:
             print(f"⚠️  Không thể ghi LoadLog cho DateDim: {e}")
+    
+    return result_info
 
 
 # -----------------------------
@@ -258,8 +275,8 @@ def execute_sql_script(conn, path):
         if not line_stripped or line_stripped.startswith('--'):
             continue
             
-        # Detect procedure start
-        if line_stripped.upper().startswith('CREATE PROCEDURE') or line_stripped.upper().startswith('DROP PROCEDURE'):
+        # Detect procedure start (only CREATE PROCEDURE, not DROP PROCEDURE)
+        if line_stripped.upper().startswith('CREATE PROCEDURE'):
             if current_statement:
                 regular_statements.append(current_statement.strip())
                 current_statement = ""
@@ -288,8 +305,27 @@ def execute_sql_script(conn, path):
         procedures.append(current_proc.strip())
 
     with conn.cursor() as cur:
-        # Execute regular statements first
+        # Separate DROP statements from other regular statements
+        drop_statements = []
+        other_statements = []
+        
         for statement in regular_statements:
+            if statement.strip():
+                if statement.strip().upper().startswith('DROP PROCEDURE'):
+                    drop_statements.append(statement)
+                else:
+                    other_statements.append(statement)
+        
+        # Execute DROP PROCEDURE statements first
+        for statement in drop_statements:
+            try:
+                cur.execute(statement)
+            except Exception as e:
+                # DROP PROCEDURE IF EXISTS shouldn't error, but if it does, just continue
+                continue
+        
+        # Execute other regular statements
+        for statement in other_statements:
             if statement.strip():
                 try:
                     cur.execute(statement)
@@ -297,12 +333,26 @@ def execute_sql_script(conn, path):
                     print(f"⚠️  Warning executing statement: {e}")
                     continue
                     
-        # Execute procedures
+        # Execute CREATE PROCEDURE statements
         for proc in procedures:
             if proc.strip():
                 try:
                     cur.execute(proc)
                 except Exception as e:
+                    # Suppress warning if procedure already exists (shouldn't happen after DROP)
+                    error_str = str(e)
+                    if 'already exists' in error_str.lower() or '1304' in error_str:
+                        # Try to extract procedure name and drop it first, then recreate
+                        match = re.search(r'CREATE\s+PROCEDURE\s+(\w+)', proc, re.IGNORECASE)
+                        if match:
+                            proc_name = match.group(1)
+                            try:
+                                cur.execute(f"DROP PROCEDURE IF EXISTS {proc_name}")
+                                cur.execute(proc)
+                                continue
+                            except Exception as retry_err:
+                                # If retry fails, suppress the warning
+                                continue
                     print(f"⚠️  Warning executing procedure: {e}")
                     print(f"Procedure: {proc[:100]}...")
                     continue
@@ -315,6 +365,17 @@ def run_pipeline():
     try:
         execute_sql_script(conn, SQL_INIT_PATH)
         print("✅ Schema + procedures ready.")
+        
+        # Ensure extract_date_sk columns exist in all tables
+        with conn.cursor() as cur:
+            if procedure_exists(conn, "ensure_extract_date_sk_columns"):
+                try:
+                    cur.callproc("ensure_extract_date_sk_columns")
+                    conn.commit()
+                    print("✅ Updated table schemas with extract_date_sk columns.")
+                except Exception as e:
+                    print(f"⚠️  Warning updating schemas: {e}")
+                    conn.rollback()
 
         files = sorted(glob.glob(os.path.join(STORAGE_PATH, "*.json")))
         if not files:
@@ -323,20 +384,70 @@ def run_pipeline():
             batch_id = f"raw_load_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             processed = 0
             errors = 0
-            with conn.cursor() as cur:
+            error_messages = {}  # Track unique errors to avoid duplicate logs
+            
+            with conn.cursor(pymysql.cursors.DictCursor) as cur:
+                # Check which files have already been processed
+                cur.execute("SELECT DISTINCT filename FROM RawJson WHERE load_status IN ('success', 'processed')")
+                processed_files = {row['filename'] for row in cur.fetchall()}
+                
                 for fp in files:
                     filename = os.path.basename(fp)
-                    for idx, line in enumerate(open(fp, "r", encoding="utf-8"), start=1):
-                        payload = line.strip()
-                        if not payload:
-                            continue
-                        try:
-                            cur.callproc("process_raw_record", (filename, payload, idx))
-                            processed += 1
-                        except Exception as err:
-                            conn.rollback()
-                            errors += 1
-                            print(f"❌ {filename}:{idx} -> {err}")
+                    
+                    # Skip if already processed
+                    if filename in processed_files:
+                        continue
+                    
+                    try:
+                        with open(fp, "r", encoding="utf-8") as f:
+                            content = f.read().strip()
+                            if not content:
+                                continue
+                            
+                            # Try to parse as JSON array first
+                            try:
+                                json_data = json.loads(content)
+                                if isinstance(json_data, list):
+                                    # Process each object in array
+                                    for idx, obj in enumerate(json_data, start=1):
+                                        payload = json.dumps(obj, ensure_ascii=False)
+                                        try:
+                                            cur.callproc("process_raw_record", (filename, payload, idx))
+                                            processed += 1
+                                        except Exception as err:
+                                            conn.rollback()
+                                            errors += 1
+                                            # Only log unique errors once
+                                            error_key = f"{filename}:{str(err)[:100]}"
+                                            if error_key not in error_messages:
+                                                error_messages[error_key] = True
+                                                print(f"❌ {filename}:{idx} -> {err}")
+                                else:
+                                    # Single JSON object
+                                    payload = json.dumps(json_data, ensure_ascii=False)
+                                    try:
+                                        cur.callproc("process_raw_record", (filename, payload, 1))
+                                        processed += 1
+                                    except Exception as err:
+                                        conn.rollback()
+                                        errors += 1
+                                        # Only log unique errors once
+                                        error_key = f"{filename}:{str(err)[:100]}"
+                                        if error_key not in error_messages:
+                                            error_messages[error_key] = True
+                                            print(f"❌ {filename}:1 -> {err}")
+                            except json.JSONDecodeError as e:
+                                errors += 1
+                                error_key = f"{filename}:JSON_ERROR"
+                                if error_key not in error_messages:
+                                    error_messages[error_key] = True
+                                    print(f"❌ Invalid JSON in {filename}: {e}")
+                    except Exception as file_err:
+                        errors += 1
+                        error_key = f"{filename}:FILE_ERROR"
+                        if error_key not in error_messages:
+                            error_messages[error_key] = True
+                            print(f"❌ Error reading {filename}: {file_err}")
                     conn.commit()
             with conn.cursor() as cur:
                 cur.callproc(
@@ -353,14 +464,12 @@ def run_pipeline():
             conn.commit()
 
             with conn.cursor() as cur:
-                load_date_dim_with_proc_or_fallback(conn, cur, DATE_DIM_PATH)
+                load_date_dim_once_if_empty(conn, cur, DATE_DIM_PATH)
             conn.commit()
 
             # Run ETL Process to extract data into structured tables
-            print("\n🔄 Starting ETL Process...")
             try:
-                etl_processor = run_etl_pipeline(conn)
-                print("✅ ETL Process completed successfully!")
+                run_etl_pipeline(conn)
             except Exception as e:
                 print(f"❌ ETL Process failed: {e}")
                 # Continue even if ETL fails, raw data is still loaded
