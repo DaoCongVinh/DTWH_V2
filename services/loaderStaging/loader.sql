@@ -8,35 +8,39 @@ USE dbStaging;
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS Authors (
-    authorID BIGINT PRIMARY KEY,
+    authorID BIGINT NOT NULL,
     Name VARCHAR(255),
     avatar TEXT,
-    extract_date_sk INT,
-    INDEX idx_author_extract_date (extract_date_sk)
+    extract_date_sk INT NOT NULL,
+    PRIMARY KEY (authorID, extract_date_sk),
+    INDEX idx_author_extract_date (extract_date_sk),
+    INDEX idx_author_id (authorID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS Videos (
-    videoID BIGINT PRIMARY KEY,
-    authorID BIGINT,
+    videoID BIGINT NOT NULL,
+    authorID BIGINT NOT NULL,
     TextContent TEXT,
     Duration INT,
     CreateTime DATETIME,
     WebVideoUrl TEXT,
     create_date_sk INT,
-    FOREIGN KEY (authorID) REFERENCES Authors(authorID),
+    PRIMARY KEY (videoID),
+    INDEX idx_video_author (authorID),
     INDEX idx_video_create_date (create_date_sk)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS VideoInteractions (
     interactionID BIGINT AUTO_INCREMENT PRIMARY KEY,
-    videoID BIGINT UNIQUE,
+    videoID BIGINT NOT NULL,
     DiggCount INT,
     PlayCount BIGINT,
     ShareCount INT,
     CommentCount INT,
     CollectCount INT,
     interaction_date_sk INT,
-    FOREIGN KEY (videoID) REFERENCES Videos(videoID),
+    UNIQUE KEY unique_video (videoID),
+    INDEX idx_video_interaction (videoID),
     INDEX idx_interaction_date (interaction_date_sk)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -66,31 +70,7 @@ CREATE TABLE IF NOT EXISTS DateDim (
     INDEX idx_calendar_year (calendar_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS DateDimStaging (
-    date_sk INT PRIMARY KEY,
-    full_date VARCHAR(20),
-    day_since_2005 INT,
-    month_since_2005 INT,
-    day_of_week VARCHAR(20),
-    calendar_month VARCHAR(20),
-    calendar_year VARCHAR(10),
-    calendar_year_month VARCHAR(20),
-    day_of_month INT,
-    day_of_year INT,
-    week_of_year_sunday INT,
-    year_week_sunday VARCHAR(20),
-    week_sunday_start VARCHAR(20),
-    week_of_year_monday INT,
-    year_week_monday VARCHAR(20),
-    week_monday_start VARCHAR(20),
-    quarter INT,
-    quarter_raw VARCHAR(20),
-    month_num INT,
-    holiday VARCHAR(50),
-    day_type VARCHAR(20),
-    INDEX idx_full_date (full_date),
-    INDEX idx_calendar_year (calendar_year)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- DateDimStaging table removed - DateDim only loads once
 
 CREATE TABLE IF NOT EXISTS RawJson (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,6 +98,109 @@ CREATE TABLE IF NOT EXISTS LoadLog (
     INDEX idx_batch (batch_id),
     INDEX idx_table_name (table_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- Procedure to add column if not exists
+-- ============================================================================
+
+DROP PROCEDURE IF EXISTS add_column_if_not_exists;
+CREATE PROCEDURE add_column_if_not_exists(
+    IN p_table_name VARCHAR(128),
+    IN p_column_name VARCHAR(128),
+    IN p_column_definition TEXT
+)
+BEGIN
+    DECLARE v_count INT;
+    SELECT COUNT(*) INTO v_count
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = p_table_name
+    AND COLUMN_NAME = p_column_name;
+    
+    IF v_count = 0 THEN
+        SET @sql = CONCAT('ALTER TABLE ', p_table_name, ' ADD COLUMN ', p_column_name, ' ', p_column_definition);
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END;
+
+DROP PROCEDURE IF EXISTS update_videointeractions_unique_key;
+CREATE PROCEDURE update_videointeractions_unique_key()
+BEGIN
+    DECLARE v_key_exists INT;
+    
+    -- Check if unique key exists
+    SELECT COUNT(*) INTO v_key_exists
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'VideoInteractions'
+    AND INDEX_NAME = 'unique_video';
+    
+    -- Drop old unique key if exists (unique_video_extract or unique_video)
+    IF v_key_exists = 0 THEN
+        SELECT COUNT(*) INTO v_key_exists
+        FROM information_schema.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'VideoInteractions'
+        AND INDEX_NAME = 'unique_video_extract';
+        
+        IF v_key_exists > 0 THEN
+            SET @sql = 'ALTER TABLE VideoInteractions DROP INDEX unique_video_extract';
+            PREPARE stmt FROM @sql;
+            EXECUTE stmt;
+            DEALLOCATE PREPARE stmt;
+        END IF;
+    END IF;
+    
+    -- Add new unique key without extract_date_sk (only videoID)
+    IF v_key_exists = 0 THEN
+        SET @sql = 'ALTER TABLE VideoInteractions ADD UNIQUE KEY unique_video (videoID)';
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END;
+
+DROP PROCEDURE IF EXISTS ensure_extract_date_sk_columns;
+CREATE PROCEDURE ensure_extract_date_sk_columns()
+BEGIN
+    DECLARE v_col_exists INT;
+    
+    -- Add extract_date_sk to Authors if not exists (only Authors needs it)
+    CALL add_column_if_not_exists('Authors', 'extract_date_sk', 'INT NOT NULL DEFAULT 0');
+    
+    -- Remove extract_date_sk from Videos if exists (no longer needed)
+    SELECT COUNT(*) INTO v_col_exists
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'Videos'
+    AND COLUMN_NAME = 'extract_date_sk';
+    
+    IF v_col_exists > 0 THEN
+        SET @sql = 'ALTER TABLE Videos DROP COLUMN extract_date_sk';
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+    
+    -- Remove extract_date_sk from VideoInteractions if exists (no longer needed)
+    SELECT COUNT(*) INTO v_col_exists
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'VideoInteractions'
+    AND COLUMN_NAME = 'extract_date_sk';
+    
+    IF v_col_exists > 0 THEN
+        SET @sql = 'ALTER TABLE VideoInteractions DROP COLUMN extract_date_sk';
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+    
+    -- Update VideoInteractions unique key (remove extract_date_sk from key)
+    CALL update_videointeractions_unique_key();
+END;
 
 -- ============================================================================
 -- Reusable procedures
@@ -230,11 +313,15 @@ BEGIN
             END IF;
         END IF;
 
-        IF v_create_time IS NOT NULL THEN
-            SELECT date_sk INTO v_date_sk
-            FROM DateDim
-            WHERE full_date LIKE CONCAT(DATE_FORMAT(v_create_time, '%Y-%m-%d'), '%')
-            LIMIT 1;
+        -- Lấy date_sk từ ngày hiện tại (ngày ETL chạy), không phải từ CreateTime của video
+        SELECT date_sk INTO v_date_sk
+        FROM DateDim
+        WHERE full_date = DATE_FORMAT(CURDATE(), '%Y-%m-%d')
+        LIMIT 1;
+        
+        -- Nếu không tìm thấy, tạo date_sk tạm thời dựa trên ngày hiện tại (YYYYMMDD)
+        IF v_date_sk IS NULL THEN
+            SET v_date_sk = CAST(DATE_FORMAT(CURDATE(), '%Y%m%d') AS UNSIGNED);
         END IF;
 
         SET v_web_url = COALESCE(
@@ -277,7 +364,7 @@ BEGIN
         );
 
         INSERT INTO RawJson (filename, content, load_status, source_line)
-        VALUES (p_filename, p_payload, 'processed', p_source_line);
+        VALUES (p_filename, p_payload, 'success', p_source_line);
 
         IF v_author_id IS NOT NULL AND v_author_id <> '' THEN
             INSERT INTO Authors (authorID, Name, avatar, extract_date_sk)
@@ -328,99 +415,4 @@ BEGIN
     END proc_block;
 END;
 
-DROP PROCEDURE IF EXISTS load_date_dim_from_csv;
-CREATE PROCEDURE load_date_dim_from_csv(
-    IN p_csv_path VARCHAR(512)
-)
-BEGIN
-    DECLARE v_sql TEXT;
-    DECLARE v_escaped VARCHAR(1024);
-    DECLARE v_batch VARCHAR(64);
-    DECLARE v_col_count INT DEFAULT 0;
-
-    SET v_batch = CONCAT('date_dim_load_', DATE_FORMAT(NOW(), '%Y%m%d_%H%i%s'));
-    TRUNCATE TABLE DateDimStaging;
-    
-    -- Check if quarter_raw column exists, add if not
-    SELECT COUNT(*) INTO v_col_count
-    FROM information_schema.COLUMNS 
-    WHERE TABLE_SCHEMA = DATABASE() 
-      AND TABLE_NAME = 'DateDimStaging' 
-      AND COLUMN_NAME = 'quarter_raw';
-    
-    IF v_col_count = 0 THEN
-        ALTER TABLE DateDimStaging ADD COLUMN quarter_raw VARCHAR(20) AFTER quarter;
-    END IF;
-    
-    SET v_escaped = REPLACE(p_csv_path, '\\', '\\\\');
-    SET v_sql = CONCAT(
-        "LOAD DATA LOCAL INFILE '",
-        v_escaped,
-        "' INTO TABLE DateDimStaging FIELDS TERMINATED BY ',' LINES TERMINATED BY '\\n' ",
-        "(date_sk, full_date, day_since_2005, month_since_2005, day_of_week, calendar_month, calendar_year, calendar_year_month, ",
-        "day_of_month, day_of_year, week_of_year_sunday, year_week_sunday, week_sunday_start, week_of_year_monday, ",
-        "year_week_monday, week_monday_start, quarter_raw, month_num, holiday, day_type)"
-    );
-    PREPARE stmt FROM v_sql;
-    EXECUTE stmt;
-    DEALLOCATE PREPARE stmt;
-
-    -- Convert quarter_raw to quarter integer
-    UPDATE DateDimStaging 
-    SET quarter = CASE 
-        WHEN quarter_raw LIKE '%Q01' THEN 1
-        WHEN quarter_raw LIKE '%Q02' THEN 2
-        WHEN quarter_raw LIKE '%Q03' THEN 3
-        WHEN quarter_raw LIKE '%Q04' THEN 4
-        ELSE CAST(quarter_raw AS UNSIGNED)
-    END;
-
-    INSERT INTO DateDim (
-        date_sk, full_date, day_since_2005, month_since_2005,
-        day_of_week, calendar_month, calendar_year, calendar_year_month,
-        day_of_month, day_of_year, week_of_year_sunday, year_week_sunday,
-        week_sunday_start, week_of_year_monday, year_week_monday,
-        week_monday_start, quarter, quarter_raw, month_num, holiday, day_type
-    )
-    SELECT
-        date_sk, full_date, day_since_2005, month_since_2005,
-        day_of_week, calendar_month, calendar_year, calendar_year_month,
-        day_of_month, day_of_year, week_of_year_sunday, year_week_sunday,
-        week_sunday_start, week_of_year_monday, year_week_monday,
-        week_monday_start, quarter, quarter_raw, month_num, holiday, day_type
-    FROM DateDimStaging
-    ON DUPLICATE KEY UPDATE
-        full_date = VALUES(full_date),
-        day_since_2005 = VALUES(day_since_2005),
-        month_since_2005 = VALUES(month_since_2005),
-        day_of_week = VALUES(day_of_week),
-        calendar_month = VALUES(calendar_month),
-        calendar_year = VALUES(calendar_year),
-        calendar_year_month = VALUES(calendar_year_month),
-        day_of_month = VALUES(day_of_month),
-        day_of_year = VALUES(day_of_year),
-        week_of_year_sunday = VALUES(week_of_year_sunday),
-        year_week_sunday = VALUES(year_week_sunday),
-        week_sunday_start = VALUES(week_sunday_start),
-        week_of_year_monday = VALUES(week_of_year_monday),
-        year_week_monday = VALUES(year_week_monday),
-        week_monday_start = VALUES(week_monday_start),
-        quarter = VALUES(quarter),
-        quarter_raw = VALUES(quarter_raw),
-        month_num = VALUES(month_num),
-        holiday = VALUES(holiday),
-        day_type = VALUES(day_type);
-        
-    -- Clean up temporary column from staging only
-    SELECT COUNT(*) INTO v_col_count
-    FROM information_schema.COLUMNS 
-    WHERE TABLE_SCHEMA = DATABASE() 
-      AND TABLE_NAME = 'DateDimStaging' 
-      AND COLUMN_NAME = 'quarter_raw';
-    
-    IF v_col_count > 0 THEN
-        ALTER TABLE DateDimStaging DROP COLUMN quarter_raw;
-    END IF;
-
-    CALL insert_load_log(v_batch, 'DateDim', 'UPSERT', (SELECT COUNT(*) FROM DateDimStaging), 'success', NULL);
-END;
+-- load_date_dim_from_csv procedure removed - DateDim only loads once using Python fallback
