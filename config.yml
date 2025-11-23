@@ -20,6 +20,6 @@ mysql:
 
 schedule:
   enabled: false
-  cron: "0 8 * * *"        
+  cron: "30 14 * * *"          
   timezone: "Asia/Ho_Chi_Minh"
 
