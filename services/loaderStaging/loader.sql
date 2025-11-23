@@ -322,6 +322,44 @@ BEGIN
         -- Nếu không tìm thấy, tạo date_sk tạm thời dựa trên ngày hiện tại (YYYYMMDD)
         IF v_date_sk IS NULL THEN
             SET v_date_sk = CAST(DATE_FORMAT(CURDATE(), '%Y%m%d') AS UNSIGNED);
+            
+            -- Tự động thêm ngày hiện tại vào DateDim nếu chưa có để tránh lỗi Foreign Key
+            -- Không dùng INSERT IGNORE để xử lý lỗi constraint
+            BEGIN
+                DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN
+                    -- Nếu lỗi, chỉ bỏ qua (date_sk có thể đã tồn tại)
+                END;
+                
+                INSERT INTO DateDim (
+                    date_sk, full_date, day_since_2005, month_since_2005, 
+                    day_of_week, calendar_month, calendar_year, calendar_year_month,
+                    day_of_month, day_of_year, week_of_year_sunday, year_week_sunday,
+                    week_sunday_start, week_of_year_monday, year_week_monday,
+                    week_monday_start, quarter, quarter_raw, month_num, holiday, day_type
+                ) VALUES (
+                    v_date_sk,
+                    DATE_FORMAT(CURDATE(), '%Y-%m-%d'),
+                    DATEDIFF(CURDATE(), '2005-01-01'),
+                    TIMESTAMPDIFF(MONTH, '2005-01-01', CURDATE()),
+                    DAYNAME(CURDATE()),
+                    MONTHNAME(CURDATE()),
+                    YEAR(CURDATE()),
+                    DATE_FORMAT(CURDATE(), '%Y-%b'),
+                    DAY(CURDATE()),
+                    DAYOFYEAR(CURDATE()),
+                    WEEK(CURDATE(), 0),
+                    CONCAT(YEAR(CURDATE()), '-W', WEEK(CURDATE(), 0)),
+                    DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL DAYOFWEEK(CURDATE())-1 DAY), '%Y-%m-%d'),
+                    WEEK(CURDATE(), 1),
+                    CONCAT(YEAR(CURDATE()), '-W', WEEK(CURDATE(), 1)),
+                    DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY), '%Y-%m-%d'),
+                    QUARTER(CURDATE()),
+                    CONCAT(YEAR(CURDATE()), '-Q', QUARTER(CURDATE())),
+                    MONTH(CURDATE()),
+                    'Non-Holiday',
+                    IF(DAYOFWEEK(CURDATE()) IN (1, 7), 'Weekend', 'Weekday')
+                );
+            END;
         END IF;
 
         SET v_web_url = COALESCE(
