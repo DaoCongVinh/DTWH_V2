@@ -40,6 +40,13 @@ def job():
                     print(f"⚠️  Warning updating schemas: {e}")
                     conn.rollback()
 
+        # --- BƯỚC 1.5: LOAD DATE DIMENSION FIRST (before processing any data) ---
+        current_step = "Load Date Dimension"
+        with conn.cursor() as cur:
+            load_date_dim_once_if_empty(conn, cur, DATE_DIM_PATH)
+        conn.commit()
+        print("✅ DateDim ready for foreign key references.")
+
         # --- BƯỚC 2: LOAD RAW JSON FILES ---
         current_step = "Load Raw JSON Files"
         files = sorted(glob.glob(os.path.join(STORAGE_PATH, "*.json")))
@@ -134,13 +141,7 @@ def job():
             )
         conn.commit()
 
-        # --- BƯỚC 3: LOAD DATE DIMENSION ---
-        current_step = "Load Date Dimension"
-        with conn.cursor() as cur:
-            load_date_dim_once_if_empty(conn, cur, DATE_DIM_PATH)
-        conn.commit()
-
-        # --- BƯỚC 4: RUN ETL PROCESS ---
+        # --- BƯỚC 3: RUN ETL PROCESS ---
         current_step = "ETL Process"
         try:
             run_etl_pipeline(conn)
@@ -160,4 +161,3 @@ def job():
     finally:
         if conn:
             conn.close()
-
