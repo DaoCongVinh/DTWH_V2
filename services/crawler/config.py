@@ -1,48 +1,123 @@
-# config.py
 import os
 import yaml
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 
-# Load .env variables
-load_dotenv()
+# 1. Thiết lập đường dẫn gốc
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Load config.yml
-CONFIG_PATH = os.getenv("CONFIG_PATH", "/app/config.yml")
-with open(CONFIG_PATH, "r") as f:
-    cfg = yaml.safe_load(f)
+# 2. Load biến môi trường từ file .env
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-# Apify Config
-APIFY_TOKEN = os.getenv("APIFY_TOKEN") or cfg.get("apify", {}).get("token")
-APIFY_ACTOR = os.getenv("APIFY_ACTOR") or cfg.get("apify", {}).get("actor_id")
+# --- HÀM GỬI MAIL KHẨN CẤP (Dùng riêng cho Config) ---
+def _send_emergency_alert(error_message):
+    """
+    Hàm này hoạt động độc lập, lấy thông tin trực tiếp từ os.getenv
+    để đảm bảo gửi được mail kể cả khi config chưa load xong.
+    """
+    sender = os.getenv("MAIL_SENDER")
+    password = os.getenv("MAIL_PASSWORD")
+    receiver = os.getenv("MAIL_RECEIVER")
+    device_id = os.getenv("DEVICE_ID", "Unknown-Device")
 
-# App Config
-DEVICE_ID = cfg.get("app", {}).get("device_id", "device-unknown")
-STORAGE_PATH = cfg.get("app", {}).get("storage_path", "/data/storage")
-FILE_PATTERN = cfg.get("app", {}).get("file_pattern", "*.json")
-DATE_FORMAT = cfg.get("app", {}).get("date_format", "%Y-%m-%d")
+    if not sender or not password or not receiver:
+        print("❌ CRITICAL: Không thể gửi mail báo lỗi Config vì thiếu thông tin Email trong .env")
+        return
 
-# MySQL Config
-MYSQL_CONF = cfg.get("mysql") or {}
-MYSQL_HOST = os.getenv("MYSQL_HOST", MYSQL_CONF.get("host", "db"))
-MYSQL_PORT = int(os.getenv("MYSQL_PORT", MYSQL_CONF.get("port", 3306)))
-MYSQL_USER = os.getenv("MYSQL_USER", MYSQL_CONF.get("user"))
-MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", MYSQL_CONF.get("password"))
-MYSQL_DB = os.getenv("MYSQL_DATABASE", MYSQL_CONF.get("database"))
+    subject = f"[CRITICAL] Config Load Failed - {device_id}"
+    body = f"""
+    <h3 style="color: red;">Hệ thống gặp lỗi nghiêm trọng khi tải cấu hình!</h3>
+    <p><b>Device:</b> {device_id}</p>
+    <p><b>Error Detail:</b></p>
+    <pre>{error_message}</pre>
+    <p><i>Hệ thống sẽ cố gắng chạy tiếp bằng biến môi trường (nếu có).</i></p>
+    """
 
-# Schedule Config
-SCHEDULE_CONF = cfg.get("schedule", {})
-SCHEDULE_ENABLED = SCHEDULE_CONF.get("enabled", True)
-SCHEDULE_CRON = SCHEDULE_CONF.get("cron")
-SCHEDULE_TIMEZONE = SCHEDULE_CONF.get("timezone", "UTC")
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = receiver
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'html'))
 
-# Source Config
-SOURCE_NAME = cfg.get("source", {}).get("name", "Apify Crawl")
-SOURCE_URL = cfg.get("source", {}).get("url", "")
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, receiver, msg.as_string())
+        server.quit()
+        print("✅ Đã gửi email cảnh báo lỗi Config.")
+    except Exception as e:
+        print(f"❌ Không thể gửi email cảnh báo: {e}")
 
-# Ensure storage path exists
-os.makedirs(STORAGE_PATH, exist_ok=True)
+# 3. Xác định đường dẫn file config.yml
+DEFAULT_YAML_PATH = os.path.join(BASE_DIR, "config.yml")
+CONFIG_PATH = os.getenv("CONFIG_PATH", DEFAULT_YAML_PATH)
 
-# Email Config
+cfg = {}
+if os.path.exists(CONFIG_PATH):
+    try:
+        with open(CONFIG_PATH, "r") as f:
+            cfg = yaml.safe_load(f) or {}
+    except Exception as e:
+        # ===> KÍCH HOẠT GỬI MAIL KHI LỖI <===
+        err_msg = f"Lỗi đọc file YAML tại {CONFIG_PATH}.\nChi tiết: {str(e)}"
+        print(f"Warning: {err_msg}")
+        _send_emergency_alert(err_msg)
+else:
+    print(f"Warning: config.yml not found at {CONFIG_PATH}. Using environment variables only.")
+
+# ========================================================
+# HÀM HỖ TRỢ LẤY CONFIG
+# ========================================================
+def get_conf(env_key, yaml_section, yaml_key, default=None):
+    val = os.getenv(env_key)
+    if val is not None:
+        return val
+    if cfg and yaml_section in cfg:
+        return cfg[yaml_section].get(yaml_key, default)
+    return default
+
+# ========================================================
+# CÁC BIẾN CẤU HÌNH (CONSTANTS)
+# ========================================================
+
+# --- App Config ---
+DEVICE_ID = get_conf("DEVICE_ID", "app", "device_id", "device-unknown")
+
+_storage_default = os.path.join(BASE_DIR, "storage")
+STORAGE_PATH = get_conf("STORAGE_PATH", "app", "storage_path", _storage_default)
+
+if not os.path.exists(STORAGE_PATH):
+    try:
+        os.makedirs(STORAGE_PATH, exist_ok=True)
+    except Exception as e:
+        print(f"Error creating storage path {STORAGE_PATH}: {e}")
+
+FILE_PATTERN = get_conf("FILE_PATTERN", "app", "file_pattern", "*.json")
+DATE_FORMAT = get_conf("DATE_FORMAT", "app", "date_format", "%Y-%m-%d")
+SOURCE_NAME = "tiktok"
+SOURCE_URL = "https://www.tiktok.com"
+
+# --- Apify Config ---
+APIFY_TOKEN = get_conf("APIFY_TOKEN", "apify", "token")
+APIFY_ACTOR = get_conf("APIFY_ACTOR", "apify", "actor_id")
+
+# --- MySQL Config ---
+MYSQL_HOST = get_conf("MYSQL_HOST", "mysql", "host", "localhost")
+MYSQL_PORT = int(get_conf("MYSQL_PORT", "mysql", "port", 3306))
+MYSQL_USER = get_conf("MYSQL_USER", "mysql", "user", "root")
+MYSQL_PASSWORD = get_conf("MYSQL_PASSWORD", "mysql", "password", "")
+MYSQL_DB = get_conf("MYSQL_DATABASE", "mysql", "database", "metadata_tiktok")
+
+# --- Schedule Config ---
+SCHEDULE_CRON = get_conf("SCHEDULE_CRON", "schedule", "cron", "0 8 * * *")
+_sched_enabled = get_conf("SCHEDULE_ENABLED", "schedule", "enabled", "True")
+SCHEDULE_ENABLED = str(_sched_enabled).lower() in ("true", "1", "yes", "on")
+SCHEDULE_TIMEZONE = get_conf("SCHEDULE_TIMEZONE", "schedule", "timezone", "Asia/Ho_Chi_Minh")
+
+# --- Email Config ---
 MAIL_SENDER = os.getenv("MAIL_SENDER")
 MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
 MAIL_RECEIVER = os.getenv("MAIL_RECEIVER")

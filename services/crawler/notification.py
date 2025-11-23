@@ -2,30 +2,35 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from datetime import datetime  # <--- 1. Thêm dòng này
 import config
 from logging_setup import logger
 
 def send_notification(status, message, detail_info=None):
     """
     Gửi email thông báo trạng thái Job (Success/Failed).
-    :param status: "SUCCESS" hoặc "FAILED"
-    :param message: Thông điệp chính (ví dụ: "Crawl xong 100 items" hoặc "Lỗi kết nối")
-    :param detail_info: Chi tiết thêm (tên file, stack trace lỗi, v.v.)
     """
     if not config.MAIL_SENDER or not config.MAIL_PASSWORD:
         logger.warning("Email config missing. Skipping email notification.")
         return
 
-    # 1. Xác định màu sắc và tiêu đề dựa trên trạng thái
+    # 2. Lấy thời gian hiện tại và format theo cấu hình
+    try:
+        current_time = datetime.now().strftime(config.DATE_FORMAT)
+    except:
+        # Fallback nếu config sai format
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Xác định màu sắc và tiêu đề
     color = "green" if status == "SUCCESS" else "red"
     subject = f"[{status}] Crawler Report - {config.DEVICE_ID}"
 
-    # 2. Soạn nội dung HTML
+    # Soạn nội dung HTML (Sử dụng biến current_time vừa tạo)
     body = f"""
     <h3 style="color: {color};">Báo cáo trạng thái: {status}</h3>
     <ul>
         <li><b>Device ID:</b> {config.DEVICE_ID}</li>
-        <li><b>Time:</b> {config.DATE_FORMAT}</li>
+        <li><b>Time:</b> {current_time}</li> 
         <li><b>Message:</b> {message}</li>
     </ul>
     <hr>
@@ -39,7 +44,7 @@ def send_notification(status, message, detail_info=None):
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
 
-    # 3. Gửi mail
+    # Gửi mail
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
