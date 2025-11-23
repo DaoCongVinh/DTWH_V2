@@ -9,6 +9,7 @@ def check_new_crawl_data():
     Check if there are any successful crawl jobs in metadata_tiktok
     that haven't been loaded into dbStaging yet.
     """
+    
     try:
         # 1. Get recent successful crawls from metadata_tiktok
         # We use a separate connection for metadata
