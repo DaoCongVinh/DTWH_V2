@@ -5,8 +5,12 @@ services:
     image: mysql:8.0
     container_name: dtwh_v2-db
     restart: always
+    command: >
+      --local-infile=1
+      --secure-file-priv=""
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_CLIENT_FLAGS: "--local-infile=1"
     volumes:
       - db_data:/var/lib/mysql
       - ./init_db:/docker-entrypoint-initdb.d:ro
@@ -19,7 +23,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
+  
   crawler:
     build: ./services/crawler
     container_name: dtwh_v2-crawler
@@ -36,6 +40,21 @@ services:
     volumes:
       - ./storage:/data/storage
       - ./services/crawler/config.yml:/app/config.yml:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tiktok_network
+  etl:
+    build: ./services/transformer
+    container_name: dtwh_v2-etl
+    restart: always
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+      MYSQL_ROOT_USER: ${MYSQL_ROOT_USER}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DB_WAREHOUSE: warehouse_tiktok
     depends_on:
       db:
         condition: service_healthy
@@ -66,6 +85,7 @@ services:
         condition: service_healthy
     networks:
       - tiktok_network
+
   aggregate:
     build: ./services/aggregate
     env_file: .env
@@ -82,6 +102,7 @@ services:
         condition: service_completed_successfully
     networks:
       - tiktok_network
+
 networks:
   tiktok_network:
 
