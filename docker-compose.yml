@@ -65,7 +65,22 @@ services:
         condition: service_healthy
     networks:
       - tiktok_network
-
+  aggregate:
+    build: ./services/aggregate
+    env_file: .env
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST:-db}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dwh_tiktok}
+      MYSQL_USER: ${MYSQL_USER:-user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dwhtiktok}
+    depends_on:
+      db:
+        condition: service_healthy
+      loader-staging:
+        condition: service_completed_successfully
+    networks:
+      - tiktok_network
 networks:
   tiktok_network:
 
