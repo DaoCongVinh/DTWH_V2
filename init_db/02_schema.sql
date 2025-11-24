@@ -299,6 +299,158 @@ CREATE TABLE IF NOT EXISTS fact_video_interactions (
 
 
 -- ============================================================================
+-- metadata database (create after staging because it's independent)
+-- ============================================================================
+USE metadata_tiktok;
+
+CREATE TABLE IF NOT EXISTS config_log (
+    id_config INT AUTO_INCREMENT PRIMARY KEY,
+    source_name VARCHAR(255),
+    source_url VARCHAR(1024),
+    api_endpoint VARCHAR(1024),
+    file_path TEXT,
+    file_pattern VARCHAR(255),
+    date_format VARCHAR(64),
+    schedule_time VARCHAR(64),
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS control_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_config INT,
+    file_name VARCHAR(255),
+    status VARCHAR(64),
+    extract_time DATETIME,
+    total_record INT,
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_config) REFERENCES config_log(id_config)
+);
+
+CREATE TABLE etl_run_log (
+    run_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    
+    procedure_name VARCHAR(255),
+    start_time DATETIME NOT NULL,
+    end_time DATETIME DEFAULT NULL,
+
+    status ENUM('RUNNING', 'SUCCESS', 'FAILED') NOT NULL,
+
+    -- Performance metrics
+    inserted_dim_authors INT DEFAULT 0,
+    updated_dim_authors INT DEFAULT 0,
+    inserted_dim_videos INT DEFAULT 0,
+    updated_dim_videos INT DEFAULT 0,
+    inserted_fact INT DEFAULT 0,
+    updated_fact INT DEFAULT 0,
+
+    -- Error tracking
+    error_message TEXT DEFAULT NULL,
+    error_state VARCHAR(10) DEFAULT NULL,
+    
+    -- System / debugging
+    host_name VARCHAR(255) DEFAULT NULL,
+    container_id VARCHAR(255) DEFAULT NULL,
+    procedure_version VARCHAR(20) DEFAULT NULL,
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS config_etl (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    procedure_name VARCHAR(255) NOT NULL,
+    is_active TINYINT DEFAULT 1,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- NOW CREATE warehouse_tiktok (DateDim already exists, so foreign keys will work!)
+-- ============================================================================
+CREATE DATABASE IF NOT EXISTS warehouse_tiktok
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE warehouse_tiktok;
+
+-- ============================================================================
+-- dim_authors
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS dim_authors (
+    author_sk INT AUTO_INCREMENT PRIMARY KEY,
+    author_id VARCHAR(50) NOT NULL,
+    author_name VARCHAR(255),
+    avatar VARCHAR(1024),
+
+    start_date_sk INT NOT NULL,
+    end_date_sk INT DEFAULT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_author_id (author_id),
+    INDEX idx_is_current (is_current),
+
+    FOREIGN KEY (start_date_sk) REFERENCES dbStaging.DateDim(date_sk),
+    FOREIGN KEY (end_date_sk)   REFERENCES dbStaging.DateDim(date_sk)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================================
+-- dim_videos
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS dim_videos (
+    video_sk INT AUTO_INCREMENT PRIMARY KEY,
+    video_id VARCHAR(50) NOT NULL,
+    author_id VARCHAR(50) NOT NULL,
+
+    text_content TEXT,
+    duration INT,
+    create_time DATETIME,
+    web_video_url VARCHAR(1024),
+
+    start_date_sk INT NOT NULL,
+    end_date_sk INT DEFAULT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_video_id (video_id),
+    INDEX idx_author_id (author_id),
+    INDEX idx_is_current (is_current),
+
+    FOREIGN KEY (start_date_sk) REFERENCES dbStaging.DateDim(date_sk),
+    FOREIGN KEY (end_date_sk)   REFERENCES dbStaging.DateDim(date_sk)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================================
+-- fact_video_interactions
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS fact_video_interactions (
+    interaction_sk INT AUTO_INCREMENT PRIMARY KEY,
+    video_id VARCHAR(50) NOT NULL,
+
+    digg_count INT DEFAULT 0,
+    play_count INT DEFAULT 0,
+    share_count INT DEFAULT 0,
+    comment_count INT DEFAULT 0,
+    collect_count INT DEFAULT 0,
+
+    start_date_sk INT NOT NULL,
+    end_date_sk INT DEFAULT NULL,
+    is_current BOOLEAN DEFAULT TRUE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_video_id (video_id),
+    INDEX idx_is_current (is_current),
+
+    FOREIGN KEY (start_date_sk) REFERENCES dbStaging.DateDim(date_sk),
+    FOREIGN KEY (end_date_sk)   REFERENCES dbStaging.DateDim(date_sk)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
 -- Schema: dbAgg - Aggregation Database
 -- Purpose: Store aggregated data for reporting and analytics
 -- ============================================================================
@@ -330,3 +482,5 @@ CREATE TABLE IF NOT EXISTS agg_daily_performance (
     totalShares BIGINT,
     totalVideos INT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
