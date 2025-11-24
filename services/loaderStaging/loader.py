@@ -21,7 +21,7 @@ from db import (
     RawJsonManager,
     UpsertManager,
     LoadLogManager,
-    DateDimManager
+    
 )
 from transformer import TikTokTransformer
 
@@ -89,7 +89,6 @@ class TikTokLoader:
         self.raw_json_manager = RawJsonManager(self.db_conn)
         self.upsert_manager = UpsertManager(self.db_conn)
         self.load_log_manager = LoadLogManager(self.db_conn)
-        self.date_dim_manager = DateDimManager(self.db_conn)
         
         self.validator = JSONValidator(config.SCHEMA_FILE)
         
@@ -394,35 +393,7 @@ class TikTokLoader:
         logger.info(f"Hoàn thành xử lý thư mục: {stats}")
         return stats
     
-    def load_date_dim(self) -> bool:
-        logger.info("Đang tải bảng DateDim từ CSV...")
-        
-        # Try validation load first (with detailed error handling)
-        success, stats = self.date_dim_manager.load_date_dim_with_validation(config.DATE_DIM_PATH)
-        
-        if success:
-            logger.info(
-                f"Tải DateDim thành công: "
-                f"Tổng={stats['total_records']}, "
-                f"Đã tải={stats['loaded_records']}, "
-                f"Bỏ qua={stats['skipped_records']}, "
-                f"Thời gian={stats['duration_seconds']:.2f}s"
-            )
-            if stats['errors']:
-                logger.warning(f"Gặp {len(stats['errors'])} cảnh báo kiểm tra trong quá trình tải")
-                for error in stats['errors'][:5]:
-                    logger.warning(f"  - {error}")
-        else:
-            logger.error(
-                f"Tải DateDim thất bại: "
-                f"Tổng số bản ghi đã xử lý={stats['total_records']}, "
-                f"Đã tải={stats['loaded_records']}, "
-                f"Lỗi={len(stats['errors'])}"
-            )
-            for error in stats['errors'][:10]:
-                logger.error(f"  - {error}")
-        
-        return success
+    
     
     def cleanup(self):
         """Cleanup and close connections"""
@@ -573,9 +544,6 @@ def main():
                "  python loader.py                           # Run full pipeline\n"
                "  python loader.py --load_raw                # Only load raw JSON\n"
                "  python loader.py --load_staging            # Only load staging tables\n"
-               "  python loader.py --load-date-dim           # Load DateDim with validation\n"
-               "  python loader.py --load-date-dim --simple  # Load DateDim (fast mode)\n"
-               "  python loader.py --verify-date-dim         # Verify DateDim data\n"
                "  python loader.py --schedule                # Run with scheduler"
     )
     
@@ -583,43 +551,15 @@ def main():
     parser.add_argument("--load_staging", action="store_true", help="Only load staging tables")
     parser.add_argument("--no-remove", action="store_true", help="Don't move files after processing")
     parser.add_argument("--schedule", action="store_true", help="Run with scheduler")
-    parser.add_argument("--load-date-dim", action="store_true", help="Load DateDim from CSV")
     parser.add_argument("--simple", action="store_true", help="Use simple LOAD DATA INFILE")
-    parser.add_argument("--verify-date-dim", action="store_true", help="Verify DateDim integrity")
     parser.add_argument("--verbose", action="store_true", help="Show detailed errors")
     parser.add_argument("--csv", default=config.DATE_DIM_PATH, help=f"CSV path (default: {config.DATE_DIM_PATH})")
     
     args = parser.parse_args()
     
-    if args.verify_date_dim:
-        logger.info("=" * 80)
-        logger.info("Kiểm Tra DateDim")
-        logger.info("=" * 80)
-        success = verify_date_dim()
-        sys.exit(0 if success else 1)
+  
     
-    if args.load_date_dim:
-        logger.info("=" * 80)
-        logger.info("Tải DateDim")
-        logger.info("=" * 80)
-        
-        csv_path = Path(args.csv)
-        if not csv_path.exists():
-            logger.error(f"Không tìm thấy file CSV: {args.csv}")
-            sys.exit(1)
-        
-        if args.simple:
-            success = load_date_dim_simple(args.csv)
-        else:
-            success = load_date_dim_validated(args.csv, args.verbose)
-        
-        if success:
-            logger.info("\nĐang kiểm tra kết quả tải...")
-            verify_success = verify_date_dim()
-            sys.exit(0 if verify_success else 1)
-        else:
-            logger.error("Tải DateDim thất bại!")
-            sys.exit(1)
+    
     
     logger.info("=" * 80)
     logger.info("Dịch Vụ TikTok Loader Staging Đã Khởi Động")
@@ -627,7 +567,6 @@ def main():
     
     try:
         loader = TikTokLoader()
-        loader.load_date_dim()
         
         skip_staging = args.load_raw
         keep_files = args.no_remove
