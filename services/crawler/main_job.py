@@ -24,7 +24,7 @@ def job():
         current_step = "Apify Crawl"
         logger.info("Connecting to Apify...")
         
-        run_input = {"hashtags": ["fyp"], "resultsPerPage": 3}
+        run_input = {"hashtags": ["fyp"], "resultsPerPage": 10}
         
         # Nếu Apify sai token/mạng lỗi, hàm này văng lỗi -> Nhảy xuống except -> Gửi mail
         run_id, dataset_id, items = apify_service.run_actor(

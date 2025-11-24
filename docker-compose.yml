@@ -31,6 +31,7 @@ services:
       MYSQL_USER: ${CRAWLER_DB_USER}
       MYSQL_PASSWORD: ${CRAWLER_DB_PASSWORD}
       MYSQL_DATABASE: ${CRAWLER_DATABASE}
+      STORAGE_PATH: /data/storage
       TZ: Asia/Ho_Chi_Minh
     volumes:
       - ./storage:/data/storage
@@ -45,7 +46,7 @@ services:
     build:
       context: ./services/loaderStaging
     container_name: dtwh_v2-loader-staging
-    restart: on-failure
+    restart: always
     env_file: .env
     environment:
       MYSQL_HOST: db
