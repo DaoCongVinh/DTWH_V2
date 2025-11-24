@@ -1,0 +1,4 @@
+mysql-connector-python==8.2.0
+jsonschema==4.20.0
+APScheduler==3.10.4
+python-dotenv==1.0.0

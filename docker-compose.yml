@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: dtwh_v2-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init_db:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - tiktok_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  crawler:
+    build: ./services/crawler
+    container_name: dtwh_v2-crawler
+    restart: always
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${CRAWLER_DB_USER}
+      MYSQL_PASSWORD: ${CRAWLER_DB_PASSWORD}
+      MYSQL_DATABASE: ${CRAWLER_DATABASE}
+      STORAGE_PATH: /data/storage
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ./storage:/data/storage
+      - ./services/crawler/config.yml:/app/config.yml:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tiktok_network
+
+  etl:
+    build: ./services/transformer
+    container_name: dtwh_v2-etl
+    restart: always
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+      MYSQL_ROOT_USER: ${MYSQL_ROOT_USER}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DB_WAREHOUSE: warehouse_tiktok
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tiktok_network
+
+  loader-staging:
+    build:
+      context: ./services/loaderStaging
+    container_name: dtwh_v2-loader-staging
+    restart: always
+    env_file: .env
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${LOADER_DB_USER}
+      MYSQL_PASSWORD: ${LOADER_DB_PASSWORD}
+      MYSQL_DATABASE: ${LOADER_DATABASE}
+      STORAGE_PATH: /data/storage
+      DATE_DIM_PATH: /app/date_dim.csv
+      SCHEDULE_ENABLED: ${LOADER_SCHEDULE_ENABLED}
+      SCHEDULE_CRON: ${LOADER_SCHEDULE_CRON}
+    volumes:
+      - ./storage:/data/storage
+      - ./services/loaderStaging/date_dim.csv:/app/date_dim.csv:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tiktok_network
+  aggregate:
+    build: ./services/aggregate
+    env_file: .env
+    environment:
+      MYSQL_HOST: ${MYSQL_HOST:-db}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dwh_tiktok}
+      MYSQL_USER: ${MYSQL_USER:-user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dwhtiktok}
+    depends_on:
+      db:
+        condition: service_healthy
+      loader-staging:
+        condition: service_completed_successfully
+    networks:
+      - tiktok_network
+networks:
+  tiktok_network:
+
+volumes:
+  db_data:

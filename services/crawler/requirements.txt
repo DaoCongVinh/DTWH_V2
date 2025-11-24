@@ -1,0 +1,9 @@
+apify-client
+cryptography
+mysql-connector-python
+pyyaml
+pymysql
+schedule
+requests
+APScheduler
+dotenv

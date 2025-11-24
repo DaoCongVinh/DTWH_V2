@@ -1,0 +1,20 @@
+app:
+  run_mode: "production"
+  storage_path: "/data/storage"
+  max_items_per_run: 1000
+
+apify:
+  token: "${APIFY_TOKEN}"
+  actor_id: "${APIFY_ACTOR}"
+
+mysql:
+  host: "db"
+  port: 3306
+  user: "${CRAWLER_DB_USER}"
+  password: "${CRAWLER_DB_PASSWORD}"
+  database: "${CRAWLER_DATABASE}"
+
+schedule:
+  enabled: ${SCHEDULE_ENABLED}
+  cron: "${SCHEDULE_CRON}"
+  timezone: "Asia/Ho_Chi_Minh"
