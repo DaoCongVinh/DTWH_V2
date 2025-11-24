@@ -295,7 +295,7 @@ git clone <repo>
 cd DTWH_V2
 
 # 2. Copy environment variables
-cp .env.example .env
+cp .env .env
 
 # 3. Edit .env
 nano .env

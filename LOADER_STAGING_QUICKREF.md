@@ -28,7 +28,7 @@ Root directory:
 
 ### 1️⃣ Configure
 ```bash
-cp .env.example .env
+cp .env .env
 nano .env  # Edit your database credentials
 ```
 

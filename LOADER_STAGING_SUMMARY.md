@@ -135,7 +135,7 @@ python loader.py --schedule
 cd d:\DTWH_V2
 
 # Copy env template
-cp .env.example .env
+cp .env .env
 
 # Edit .env with your credentials
 # Then run setup
