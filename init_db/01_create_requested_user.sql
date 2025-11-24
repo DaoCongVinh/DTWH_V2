@@ -5,6 +5,7 @@ GRANT ALL PRIVILEGES ON dbStaging.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON metadata_tiktok.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON staging_tiktok.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON warehouse_tiktok.* TO 'user'@'%';
+GRANT ALL PRIVILEGES ON dbAgg.* TO 'user'@'%';
 FLUSH PRIVILEGES;
 
 
