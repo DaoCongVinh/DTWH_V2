@@ -1,0 +1,7 @@
+-- Create all required databases
+CREATE DATABASE IF NOT EXISTS metadata_tiktok;
+CREATE DATABASE IF NOT EXISTS staging_tiktok;
+CREATE DATABASE IF NOT EXISTS warehouse_tiktok;
+CREATE DATABASE IF NOT EXISTS dbStaging;
+CREATE DATABASE IF NOT EXISTS dwh_tiktok;
+CREATE DATABASE IF NOT EXISTS dbAgg;
