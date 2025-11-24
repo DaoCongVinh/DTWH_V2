@@ -1,8 +1,3 @@
-"""
-Loader Staging Main Module
-Orchestrates the entire ETL pipeline for TikTok data from APIFY crawler
-"""
-
 import json
 import os
 import sys
@@ -26,12 +21,9 @@ from db import (
     RawJsonManager,
     UpsertManager,
     LoadLogManager,
-    DateDimManager
+    
 )
-
-# ============================================================================
-# Setup Logging
-# ============================================================================
+from transformer import TikTokTransformer
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL),
@@ -43,26 +35,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ============================================================================
-# Constants
-# ============================================================================
-
 BATCH_ID = f"LOAD_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-# ============================================================================
-# Validator Class
-# ============================================================================
-
 class JSONValidator:
-    """Validates JSON data against schema"""
+    """Validate JSON data against schema"""
     
     def __init__(self, schema_path: str):
-        """
-        Initialize validator
-        
-        Args:
-            schema_path: Path to JSON schema file
-        """
         self.schema = self._load_schema(schema_path)
     
     @staticmethod
@@ -71,117 +49,39 @@ class JSONValidator:
         try:
             with open(schema_path, 'r', encoding='utf-8') as f:
                 schema = json.load(f)
-            logger.info(f"Loaded schema from {schema_path}")
+            logger.info(f"Đã tải schema từ {schema_path}")
             return schema
         except Exception as e:
-            logger.error(f"Error loading schema: {e}")
+            logger.error(f"Lỗi khi tải schema: {e}")
             raise
     
     def validate(self, data: List[Dict[str, Any]]) -> Tuple[bool, Optional[str]]:
-        """
-        Validate JSON data
-        
-        Args:
-            data: JSON data to validate
-            
-        Returns:
-            Tuple of (is_valid, error_message)
-        """
+        """Validate JSON data against schema"""
         try:
             jsonschema.validate(instance=data, schema=self.schema)
-            logger.info(f"JSON validation passed for {len(data)} items")
+            logger.info(f"Kiểm tra JSON thành công cho {len(data)} items")
             return True, None
         except jsonschema.ValidationError as e:
-            error_msg = f"JSON validation failed: {e.message} at path {'.'.join(str(p) for p in e.path)}"
+            error_msg = f"Kiểm tra JSON thất bại: {e.message} tại đường dẫn {'.'.join(str(p) for p in e.path)}"
             logger.error(error_msg)
             return False, error_msg
         except jsonschema.SchemaError as e:
-            error_msg = f"Schema error: {e.message}"
+            error_msg = f"Lỗi schema: {e.message}"
             logger.error(error_msg)
             return False, error_msg
         except Exception as e:
-            error_msg = f"Unexpected validation error: {str(e)}"
+            error_msg = f"Lỗi kiểm tra không mong đợi: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
 
-# ============================================================================
-# Data Transformer Class
-# ============================================================================
 
-class DataTransformer:
-    """Transforms raw JSON data into structured staging tables"""
-    
-    @staticmethod
-    def extract_author(item: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract author data from item"""
-        author_meta = item.get("authorMeta", {})
-        return {
-            "author_id": author_meta.get("id", ""),
-            "author_name": author_meta.get("name", ""),
-            "avatar": author_meta.get("avatar", ""),
-        }
-    
-    @staticmethod
-    def extract_video(item: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract video data from item"""
-        video_meta = item.get("videoMeta", {})
-        create_time = datetime.fromtimestamp(
-            item.get("createTime", 0)
-        ).strftime('%Y-%m-%d %H:%M:%S') if item.get("createTime") else None
-        
-        return {
-            "video_id": item.get("id", ""),
-            "author_id": item.get("authorMeta", {}).get("id", ""),
-            "text_content": item.get("text", ""),
-            "duration": video_meta.get("duration", 0),
-            "create_time": create_time,
-            "web_video_url": item.get("webVideoUrl", ""),
-        }
-    
-    @staticmethod
-    def extract_interaction(item: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract interaction/stats data from item"""
-        return {
-            "video_id": item.get("id", ""),
-            "digg_count": item.get("diggCount", 0),
-            "play_count": item.get("playCount", 0),
-            "share_count": item.get("shareCount", 0),
-            "comment_count": item.get("commentCount", 0),
-            "collect_count": item.get("collectCount", 0),
-        }
-    
-    @staticmethod
-    def transform_file(json_data: List[Dict[str, Any]]) -> Tuple[List[Dict], List[Dict], List[Dict]]:
-        """
-        Transform JSON file into 3 tables: Authors, Videos, Interactions
-        
-        Args:
-            json_data: Raw JSON data
-            
-        Returns:
-            Tuple of (authors, videos, interactions)
-        """
-        authors = []
-        videos = []
-        interactions = []
-        
-        for item in json_data:
-            authors.append(DataTransformer.extract_author(item))
-            videos.append(DataTransformer.extract_video(item))
-            interactions.append(DataTransformer.extract_interaction(item))
-        
-        return authors, videos, interactions
-
-# ============================================================================
-# Main Loader Class
-# ============================================================================
 
 class TikTokLoader:
-    """Main loader orchestrator"""
+    """Main ETL orchestrator for TikTok data loading"""
     
     def __init__(self):
-        """Initialize loader"""
-        logger.info("Initializing TikTok Loader...")
+        logger.info("Đang khởi tạo TikTok Loader...")
+        
         self.db_conn = DatabaseConnection()
         self.db_conn.connect()
         
@@ -189,36 +89,23 @@ class TikTokLoader:
         self.raw_json_manager = RawJsonManager(self.db_conn)
         self.upsert_manager = UpsertManager(self.db_conn)
         self.load_log_manager = LoadLogManager(self.db_conn)
-        self.date_dim_manager = DateDimManager(self.db_conn)
         
         self.validator = JSONValidator(config.SCHEMA_FILE)
-        self.transformer = DataTransformer()
         
-        # Load cached data for optimization
-        logger.info("Loading batch data...")
+        logger.info("Đang tải dữ liệu batch...")
         self.existing_authors, self.existing_videos, self.existing_interactions = self.batch_fetcher.fetch_all()
         
-        # Get today's date_sk
         self.today_date_sk = self.batch_fetcher.get_today_date_sk()
         if not self.today_date_sk:
-            logger.error("Failed to get today's date_sk. Aborting.")
-            raise RuntimeError("Cannot get today's date_sk from DateDim")
+            logger.error("Không lấy được date_sk hôm nay. Dừng xử lý.")
+            raise RuntimeError("Không thể lấy date_sk hôm nay từ DateDim")
         
-        logger.info("Loader initialized successfully")
+        logger.info("Khởi tạo Loader thành công")
     
     def load_raw_json(self, file_path: str, content: str) -> bool:
-        """
-        Load raw JSON file content
-        
-        Args:
-            file_path: Path to JSON file
-            content: File content
-            
-        Returns:
-            bool: True if successful
-        """
+        """Save raw JSON to database with deduplication"""
         filename = os.path.basename(file_path)
-        logger.info(f"Saving raw JSON: {filename}")
+        logger.info(f"Đang lưu raw JSON: {filename}")
         
         return self.raw_json_manager.insert_raw_json(
             content=content,
@@ -227,21 +114,12 @@ class TikTokLoader:
         )
     
     def load_raw_json_failed(self, file_path: str, error_message: str) -> bool:
-        """
-        Log failed JSON load
-        
-        Args:
-            file_path: Path to JSON file
-            error_message: Error details
-            
-        Returns:
-            bool: True if successful
-        """
+        """Log failed JSON file to database"""
         filename = os.path.basename(file_path)
-        logger.info(f"Saving failed raw JSON: {filename}")
+        logger.info(f"Đang ghi nhận file lỗi: {filename}")
         
         return self.raw_json_manager.insert_raw_json(
-            content="",  # Don't store content for failed files
+            content="",
             filename=filename,
             status=config.LOAD_STATUS_FAILED,
             error_message=error_message
@@ -255,19 +133,6 @@ class TikTokLoader:
         batch_id: str,
         source_filename: str
     ) -> Dict[str, Any]:
-        """
-        Process and upsert data into staging tables
-        
-        Args:
-            authors: Author records
-            videos: Video records
-            interactions: Interaction records
-            batch_id: Batch identifier
-            source_filename: Source file name
-            
-        Returns:
-            Dict with load results
-        """
         results = {
             "authors": {"inserted": 0, "updated": 0, "skipped": 0, "failed": 0},
             "videos": {"inserted": 0, "updated": 0, "skipped": 0, "failed": 0},
@@ -275,7 +140,7 @@ class TikTokLoader:
         }
         
         # Process Authors
-        logger.info(f"Processing {len(authors)} authors...")
+        logger.info(f"Đang xử lý {len(authors)} tác giả...")
         start_time = datetime.now()
         for author in authors:
             if not author["author_id"] or not author["author_name"]:
@@ -316,7 +181,7 @@ class TikTokLoader:
         )
         
         # Process Videos
-        logger.info(f"Processing {len(videos)} videos...")
+        logger.info(f"Đang xử lý {len(videos)} video...")
         start_time = datetime.now()
         for video in videos:
             if not video["video_id"] or not video["author_id"]:
@@ -360,7 +225,7 @@ class TikTokLoader:
         )
         
         # Process VideoInteractions
-        logger.info(f"Processing {len(interactions)} interactions...")
+        logger.info(f"Đang xử lý {len(interactions)} tương tác...")
         start_time = datetime.now()
         for interaction in interactions:
             if not interaction["video_id"]:
@@ -406,104 +271,97 @@ class TikTokLoader:
         return results
     
     def move_file(self, file_path: str, status: str) -> bool:
-        """
-        Move file to processed or failed directory
-        
-        Args:
-            file_path: Path to file
-            status: Status (SUCCESS/FAILED)
-            
-        Returns:
-            bool: True if successful
-        """
+        """Move processed file to appropriate directory"""
         try:
             filename = os.path.basename(file_path)
-            if status == config.LOAD_STATUS_SUCCESS:
-                dest_dir = config.PROCESSED_DIR
-            else:
-                dest_dir = config.FAILED_DIR
-            
+            dest_dir = config.PROCESSED_DIR if status == config.LOAD_STATUS_SUCCESS else config.FAILED_DIR
             dest_path = os.path.join(dest_dir, filename)
             shutil.move(file_path, dest_path)
-            logger.info(f"Moved {filename} to {dest_dir}")
+            logger.info(f"Đã di chuyển {filename} tới {dest_dir}")
             return True
         except Exception as e:
-            logger.error(f"Error moving file: {e}")
+            logger.error(f"Lỗi khi di chuyển file: {e}")
             return False
     
     def process_file(self, file_path: str, skip_staging: bool = False, keep_file: bool = False) -> bool:
-        """
-        Process a single JSON file
-        
-        Args:
-            file_path: Path to JSON file
-            skip_staging: Skip staging table processing
-            keep_file: Keep file after processing
-            
-        Returns:
-            bool: True if successful
-        """
+        """Process single JSON file through ETL pipeline"""
         filename = os.path.basename(file_path)
-        logger.info(f"Processing file: {filename}")
+        logger.info(f"Đang xử lý file: {filename}")
         
         try:
-            # Read JSON file
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 json_data = json.loads(content)
             
-            # Validate JSON
             is_valid, error_msg = self.validator.validate(json_data)
             if not is_valid:
-                logger.error(f"Validation failed: {error_msg}")
+                logger.error(f"Kiểm tra thất bại: {error_msg}")
                 self.load_raw_json_failed(file_path, error_msg)
                 if not keep_file:
                     self.move_file(file_path, config.LOAD_STATUS_FAILED)
                 return False
             
-            # Load raw JSON (always)
-            if not self.load_raw_json(file_path, content):
-                logger.error("Failed to save raw JSON")
-                if not keep_file:
-                    self.move_file(file_path, config.LOAD_STATUS_FAILED)
-                return False
+            existing_video_ids = self.raw_json_manager.fetch_existing_video_ids()
+            logger.info(f"Tìm thấy {len(existing_video_ids)} video ID đã tồn tại trong RawJson")
             
-            # Skip staging if requested
-            if skip_staging:
-                logger.info("Staging processing skipped")
+            new_items = []
+            old_count = 0
+            
+            if isinstance(json_data, list):
+                for item in json_data:
+                    video_id = item.get('id')
+                    if video_id and video_id not in existing_video_ids:
+                        new_items.append(item)
+                    else:
+                        old_count += 1
+            
+            logger.info(f"Đã lọc: {len(new_items)} items MỚI, {old_count} items CŨ")
+            
+            if not new_items:
+                logger.info("Không có items mới để xử lý. Bỏ qua file.")
                 if not keep_file:
                     self.move_file(file_path, config.LOAD_STATUS_SUCCESS)
                 return True
             
-            # Transform data
-            authors, videos, interactions = self.transformer.transform_file(json_data)
+            if not self.load_raw_json(file_path, content):
+                logger.error("Lưu raw JSON thất bại")
+                if not keep_file:
+                    self.move_file(file_path, config.LOAD_STATUS_FAILED)
+                return False
             
-            # Process staging tables
+            if skip_staging:
+                logger.info("Đã bỏ qua xử lý staging")
+                if not keep_file:
+                    self.move_file(file_path, config.LOAD_STATUS_SUCCESS)
+                return True
+            
+            result = TikTokTransformer.transform_batch(new_items)
+            logger.info(f"Đã chuyển đổi {len(new_items)} items")
+            
             results = self.process_staging_tables(
-                authors=authors,
-                videos=videos,
-                interactions=interactions,
+                authors=result['authors'],
+                videos=result['videos'],
+                interactions=result['interactions'],
                 batch_id=BATCH_ID,
                 source_filename=filename
             )
             
-            logger.info(f"File processed: {results}")
+            logger.info(f"Đã xử lý file: {results}")
             
-            # Move file
             if not keep_file:
                 self.move_file(file_path, config.LOAD_STATUS_SUCCESS)
             
             return True
             
         except json.JSONDecodeError as e:
-            error_msg = f"JSON decode error: {str(e)}"
+            error_msg = f"Lỗi giải mã JSON: {str(e)}"
             logger.error(error_msg)
             self.load_raw_json_failed(file_path, error_msg)
             if not keep_file:
                 self.move_file(file_path, config.LOAD_STATUS_FAILED)
             return False
         except Exception as e:
-            error_msg = f"Unexpected error: {str(e)}"
+            error_msg = f"Lỗi không mong đợi: {str(e)}"
             logger.error(error_msg)
             self.load_raw_json_failed(file_path, error_msg)
             if not keep_file:
@@ -511,17 +369,7 @@ class TikTokLoader:
             return False
     
     def process_directory(self, skip_staging: bool = False, keep_files: bool = False) -> Dict[str, Any]:
-        """
-        Process all JSON files in storage directory
-        
-        Args:
-            skip_staging: Skip staging table processing
-            keep_files: Keep files after processing
-            
-        Returns:
-            Dict with summary statistics
-        """
-        logger.info(f"Starting directory scan: {config.STORAGE_PATH}")
+        logger.info(f"Bắt đầu quét thư mục: {config.STORAGE_PATH}")
         
         stats = {
             "total_files": 0,
@@ -533,7 +381,7 @@ class TikTokLoader:
         json_files = list(Path(config.STORAGE_PATH).glob(config.JSON_FILE_PATTERN))
         json_files = [f for f in json_files if f.is_file()]
         
-        logger.info(f"Found {len(json_files)} JSON files")
+        logger.info(f"Tìm thấy {len(json_files)} file JSON")
         
         for json_file in json_files:
             stats["total_files"] += 1
@@ -542,77 +390,25 @@ class TikTokLoader:
             else:
                 stats["failed_files"] += 1
         
-        logger.info(f"Directory processing complete: {stats}")
+        logger.info(f"Hoàn thành xử lý thư mục: {stats}")
         return stats
     
-    def load_date_dim(self) -> bool:
-        """
-        Load date dimension table from date_dim.csv
-        
-        Uses validation-based loading with detailed error reporting
-        
-        Returns:
-            bool: True if load successful, False otherwise
-        """
-        logger.info("Loading DateDim table from CSV...")
-        
-        # Try validation load first (with detailed error handling)
-        success, stats = self.date_dim_manager.load_date_dim_with_validation(config.DATE_DIM_PATH)
-        
-        if success:
-            logger.info(
-                f"DateDim load completed successfully: "
-                f"Total={stats['total_records']}, "
-                f"Loaded={stats['loaded_records']}, "
-                f"Skipped={stats['skipped_records']}, "
-                f"Duration={stats['duration_seconds']:.2f}s"
-            )
-            if stats['errors']:
-                logger.warning(f"Encountered {len(stats['errors'])} validation warnings during load")
-                for error in stats['errors'][:5]:  # Log first 5 errors
-                    logger.warning(f"  - {error}")
-        else:
-            logger.error(
-                f"DateDim load failed: "
-                f"Total records processed={stats['total_records']}, "
-                f"Loaded={stats['loaded_records']}, "
-                f"Errors={len(stats['errors'])}"
-            )
-            for error in stats['errors'][:10]:  # Log first 10 errors
-                logger.error(f"  - {error}")
-        
-        return success
+    
     
     def cleanup(self):
         """Cleanup and close connections"""
-        logger.info("Cleaning up...")
+        logger.info("Đang dọn dẹp...")
         if self.db_conn.is_connected():
             self.db_conn.disconnect()
-
-# ============================================================================
-# Scheduler
-# ============================================================================
 
 class LoaderScheduler:
     """Manages scheduled loader runs"""
     
     def __init__(self, loader: TikTokLoader):
-        """
-        Initialize scheduler
-        
-        Args:
-            loader: TikTok loader instance
-        """
         self.loader = loader
         self.scheduler = BackgroundScheduler(config.SCHEDULER_CONFIG)
     
     def start(self, cron_expression: str):
-        """
-        Start scheduler with cron expression
-        
-        Args:
-            cron_expression: Cron expression (e.g., "0 */1 * * *")
-        """
         trigger = CronTrigger.from_crontab(cron_expression, timezone="Asia/Ho_Chi_Minh")
         self.scheduler.add_job(
             self.loader.process_directory,
@@ -622,65 +418,180 @@ class LoaderScheduler:
             replace_existing=True
         )
         self.scheduler.start()
-        logger.info(f"Scheduler started with cron: {cron_expression}")
+        logger.info(f"Đã khởi động scheduler với cron: {cron_expression}")
     
     def stop(self):
-        """Stop scheduler"""
         if self.scheduler.running:
             self.scheduler.shutdown()
-            logger.info("Scheduler stopped")
+            logger.info("Đã dừng scheduler")
 
 # ============================================================================
 # CLI Interface
 # ============================================================================
 
+def load_date_dim_simple(csv_path: str) -> bool:
+    """Load DateDim using simple LOAD DATA INFILE method"""
+    logger.info(f"Đang tải DateDim từ {csv_path} (chế độ nhanh)...")
+    
+    try:
+        db_conn = DatabaseConnection()
+        db_conn.connect()
+        date_dim_manager = DateDimManager(db_conn)
+        
+        success = date_dim_manager.load_date_dim_from_csv(csv_path)
+        
+        db_conn.disconnect()
+        return success
+    except Exception as e:
+        logger.error(f"Tải thất bại: {e}")
+        return False
+
+def load_date_dim_validated(csv_path: str, verbose: bool = False) -> bool:
+    """Load DateDim with full validation and statistics"""
+    logger.info(f"Đang tải DateDim từ {csv_path} (chế độ kiểm tra)...")
+    
+    try:
+        db_conn = DatabaseConnection()
+        db_conn.connect()
+        date_dim_manager = DateDimManager(db_conn)
+        
+        success, stats = date_dim_manager.load_date_dim_with_validation(csv_path)
+        
+        # Print statistics
+        print("\n" + "=" * 80)
+        print("Thống Kê Tải DateDim")
+        print("=" * 80)
+        print(f"Trạng thái: {'✓ THÀNH CÔNG' if success else '✗ THẤT BẠI'}")
+        print(f"Tổng số bản ghi: {stats['total_records']}")
+        print(f"Đã tải: {stats['loaded_records']}")
+        print(f"Bỏ qua: {stats['skipped_records']}")
+        print(f"Thời gian: {stats['duration_seconds']:.2f}s")
+        
+        if stats['errors']:
+            print(f"\nGặp lỗi: {len(stats['errors'])}")
+            if verbose:
+                for i, error in enumerate(stats['errors'][:20], 1):
+                    print(f"  {i}. {error}")
+                if len(stats['errors']) > 20:
+                    print(f"  ... và {len(stats['errors']) - 20} lỗi khác")
+            else:
+                for i, error in enumerate(stats['errors'][:5], 1):
+                    print(f"  {i}. {error}")
+                if len(stats['errors']) > 5:
+                    print(f"  ... và {len(stats['errors']) - 5} lỗi khác")
+                print("\n  Dùng --verbose để xem tất cả lỗi")
+        else:
+            print("\n✓ Không có lỗi kiểm tra!")
+        
+        print("=" * 80 + "\n")
+        
+        db_conn.disconnect()
+        return success
+    except Exception as e:
+        logger.error(f"Load failed: {e}")
+        return False
+
+def verify_date_dim() -> bool:
+    """Verify DateDim table integrity"""
+    logger.info("Đang kiểm tra DateDim...")
+    
+    try:
+        db_conn = DatabaseConnection()
+        db_conn.connect()
+        
+        with db_conn.get_cursor() as cursor:
+            # Count records
+            cursor.execute("SELECT COUNT(*) as cnt FROM DateDim")
+            total = cursor.fetchone()[0]
+            print(f"✓ Tổng số bản ghi trong database: {total}")
+            
+            # Get date range
+            cursor.execute("SELECT MIN(full_date), MAX(full_date) FROM DateDim")
+            min_date, max_date = cursor.fetchone()
+            print(f"✓ Khoảng ngày: {min_date} đến {max_date}")
+            
+            # Sample records
+            cursor.execute("SELECT COUNT(*) FROM DateDim WHERE day_type = 'Weekend'")
+            weekend_count = cursor.fetchone()[0]
+            print(f"✓ Ngày cuối tuần: {weekend_count}")
+            
+            cursor.execute("SELECT COUNT(*) FROM DateDim WHERE day_type = 'Weekday'")
+            weekday_count = cursor.fetchone()[0]
+            print(f"✓ Ngày trong tuần: {weekday_count}")
+            
+            # Check for duplicates
+            cursor.execute(
+                "SELECT COUNT(*) FROM (SELECT date_sk FROM DateDim GROUP BY date_sk HAVING COUNT(*) > 1) t"
+            )
+            duplicates = cursor.fetchone()[0]
+            if duplicates > 0:
+                print(f"✗ Tìm thấy {duplicates} giá trị date_sk trùng lặp!")
+                return False
+            else:
+                print("✓ Không có giá trị date_sk trùng lặp")
+        
+        db_conn.disconnect()
+        return True
+    except Exception as e:
+        logger.error(f"Kiểm tra thất bại: {e}")
+        return False
+
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description="TikTok Loader Staging Service")
+    parser = argparse.ArgumentParser(
+        description="TikTok Loader Staging Service",
+        epilog="Examples:\n"
+               "  python loader.py                           # Run full pipeline\n"
+               "  python loader.py --load_raw                # Only load raw JSON\n"
+               "  python loader.py --load_staging            # Only load staging tables\n"
+               "  python loader.py --schedule                # Run with scheduler"
+    )
+    
     parser.add_argument("--load_raw", action="store_true", help="Only load raw JSON")
     parser.add_argument("--load_staging", action="store_true", help="Only load staging tables")
     parser.add_argument("--no-remove", action="store_true", help="Don't move files after processing")
     parser.add_argument("--schedule", action="store_true", help="Run with scheduler")
+    parser.add_argument("--simple", action="store_true", help="Use simple LOAD DATA INFILE")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed errors")
+    parser.add_argument("--csv", default=config.DATE_DIM_PATH, help=f"CSV path (default: {config.DATE_DIM_PATH})")
     
     args = parser.parse_args()
     
+  
+    
+    
+    
     logger.info("=" * 80)
-    logger.info("TikTok Loader Staging Service Started")
+    logger.info("Dịch Vụ TikTok Loader Staging Đã Khởi Động")
     logger.info("=" * 80)
     
     try:
-        # Initialize loader
         loader = TikTokLoader()
         
-        # Load DateDim if needed
-        loader.load_date_dim()
-        
-        # Determine skip staging mode
-        skip_staging = args.load_raw  # Skip staging if only loading raw
+        skip_staging = args.load_raw
         keep_files = args.no_remove
         
-        # Run scheduler or process directory
         if args.schedule:
             scheduler = LoaderScheduler(loader)
             scheduler.start(config.LOADER_SCHEDULE_CRON)
-            logger.info("Scheduler mode active. Press Ctrl+C to stop.")
+            logger.info("Chế độ scheduler đang hoạt động. Nhấn Ctrl+C để dừng.")
             try:
                 while True:
                     import time
                     time.sleep(1)
             except KeyboardInterrupt:
                 scheduler.stop()
-                logger.info("Scheduler stopped by user")
+                logger.info("Người dùng đã dừng scheduler")
         else:
             # Single run
             stats = loader.process_directory(skip_staging=skip_staging, keep_files=keep_files)
-            logger.info(f"Final stats: {stats}")
+            logger.info(f"Thống kê cuối cùng: {stats}")
         
         loader.cleanup()
-        logger.info("Loader finished successfully")
+        logger.info("Loader hoàn thành thành công")
         
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+        logger.error(f"Lỗi nghiêm trọng: {e}", exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":

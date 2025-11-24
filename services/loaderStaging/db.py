@@ -3,6 +3,7 @@ Database Helper Module
 Handles all database operations: connections, batch fetch, upsert, logging
 """
 
+import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Set
 from datetime import datetime
@@ -19,21 +20,36 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 class DatabaseConnection:
-    """Manages MySQL database connections"""
+    """
+    Class DatabaseConnection: Quản lý kết nối MySQL database
+    
+    Trách nhiệm:
+    - Quản lý connection lifecycle (connect, disconnect, check status)
+    - Cung cấp cursor cho các operations
+    - Handle connection pooling và errors
+    - Context manager cho safe cursor usage
+    """
     
     def __init__(self):
-        """Initialize database connection"""
+        """Khởi tạo connection object (chưa kết nối)"""
         self.connection: Optional[MySQLConnection] = None
     
     def connect(self) -> MySQLConnection:
         """
-        Establish database connection
+        Thiết lập kết nối đến MySQL database
+        
+        Đọc thông tin kết nối từ config:
+        - MYSQL_HOST: Hostname của MySQL server
+        - MYSQL_PORT: Port (mặc định 3306)
+        - MYSQL_USER: Username
+        - MYSQL_PASSWORD: Password
+        - MYSQL_DATABASE: Tên database (dbStaging)
         
         Returns:
-            MySQLConnection: Active database connection
+            MySQLConnection: Connection object đang active
             
         Raises:
-            Error: If connection fails
+            Error: Nếu kết nối thất bại (wrong credentials, network issue, etc.)
         """
         try:
             self.connection = mysql.connector.connect(
@@ -52,25 +68,46 @@ class DatabaseConnection:
             raise
     
     def disconnect(self) -> None:
-        """Close database connection"""
+        """
+        Đóng kết nối database
+        
+        Gọi method này khi:
+        - Hoàn tất toàn bộ operations
+        - Xảy ra lỗi và cần cleanup
+        - Shutdown service
+        """
         if self.connection and self.connection.is_connected():
             self.connection.close()
             logger.info("Database connection closed")
     
     def is_connected(self) -> bool:
-        """Check if connection is active"""
+        """
+        Kiểm tra connection còn active không
+        
+        Returns:
+            bool: True nếu connection đang active
+        """
         return self.connection and self.connection.is_connected()
     
     @contextmanager
     def get_cursor(self, buffered: bool = False):
         """
-        Context manager for database cursor
+        Context manager để lấy database cursor một cách an toàn
+        
+        Sử dụng:
+        ```python
+        with db_conn.get_cursor() as cursor:
+            cursor.execute("SELECT ...")
+            results = cursor.fetchall()
+        # Cursor tự động đóng sau khi exit context
+        ```
         
         Args:
-            buffered: Use buffered cursor for multiple queries
+            buffered: True = buffered cursor (cho nhiều queries)
+                     False = unbuffered cursor (tiết kiệm memory)
             
         Yields:
-            CMySQLCursor: Database cursor
+            CMySQLCursor: Database cursor để execute queries
         """
         if not self.is_connected():
             self.connect()
@@ -79,48 +116,67 @@ class DatabaseConnection:
         try:
             yield cursor
         finally:
-            cursor.close()
+            cursor.close()  # Luôn đóng cursor khi xong
 
 # ============================================================================
 # Batch Fetch Operations
 # ============================================================================
 
 class BatchFetcher:
-    """Batch fetch operations to optimize ETL"""
+    """
+    Class BatchFetcher: Batch fetch operations để tối ưu ETL
+    
+    Tại sao cần Batch Fetch?
+    - Thay vì query DB cho MỐI record (10,000 queries) → Chỉ 3 queries
+    - Load tất cả IDs vào memory → Check existence với O(1)
+    - Tăng tốc độ gấp 100-1000 lần
+    - Giảm load cho database server
+    
+    Các operations:
+    - fetch_all_authors(): Lấy tất cả author IDs
+    - fetch_all_videos(): Lấy tất cả video IDs
+    - fetch_all_interactions(): Lấy video IDs có interactions
+    - get_today_date_sk(): Lấy date_sk của hôm nay
+    """
     
     def __init__(self, db_conn: DatabaseConnection):
-        """
-        Initialize batch fetcher
-        
-        Args:
-            db_conn: Database connection instance
-        """
+        """Khởi tạo với database connection"""
         self.db_conn = db_conn
     
     def fetch_all_authors(self) -> Set[str]:
         """
-        Fetch all existing author IDs
+        Fetch tất cả author IDs đã tồn tại trong DB
+        
+        Query: SELECT DISTINCT author_id FROM Authors
+        
+        Mục đích:
+        - Cache tất cả author IDs trong memory
+        - Check author exists bằng: author_id in existing_authors (O(1))
+        - Không cần query DB cho mỗi record
         
         Returns:
-            Set[str]: Set of all existing author IDs
+            Set[str]: Set chứa tất cả author IDs
         """
         try:
             with self.db_conn.get_cursor() as cursor:
                 cursor.execute(config.Queries.GET_ALL_AUTHORS)
                 results = cursor.fetchall()
+                # Convert list of tuples thành Set of IDs
                 author_ids = {row[0] for row in results}
                 logger.info(f"Fetched {len(author_ids)} existing authors")
                 return author_ids
         except Error as e:
             logger.error(f"Error fetching authors: {e}")
-            return set()
+            return set()  # Return empty set nếu lỗi
     
     def fetch_all_videos(self) -> Set[str]:
         """
-        Fetch all existing video IDs
+        Fetch tất cả video IDs đã tồn tại trong DB
+        
+        Query: SELECT DISTINCT video_id FROM Videos
         
         Returns:
-            Set[str]: Set of all existing video IDs
+            Set[str]: Set chứa tất cả video IDs
         """
         try:
             with self.db_conn.get_cursor() as cursor:
@@ -153,13 +209,23 @@ class BatchFetcher:
     
     def fetch_all(self) -> Tuple[Set[str], Set[str], Set[str]]:
         """
-        Batch fetch all data in 3 queries
+        Batch fetch tất cả data trong 3 queries song song
+        
+        Thực hiện:
+        1. Fetch all author IDs
+        2. Fetch all video IDs
+        3. Fetch all video IDs with interactions
+        
+        Lợi ích:
+        - Chỉ 3 queries thay vì hàng nghìn queries
+        - Tải data 1 lần vào memory
+        - Lookup cực nhanh với Set.in (O(1))
         
         Returns:
-            Tuple containing:
-                - Set of author IDs
-                - Set of video IDs
-                - Set of video IDs with interactions
+            Tuple chứa 3 Sets:
+            - Set[str]: Author IDs
+            - Set[str]: Video IDs
+            - Set[str]: Video IDs with interactions
         """
         logger.info("Starting batch fetch...")
         authors = self.fetch_all_authors()
@@ -194,16 +260,145 @@ class BatchFetcher:
 # ============================================================================
 
 class RawJsonManager:
-    """Manage RawJson table operations"""
+    """
+    Class RawJsonManager: Quản lý bảng RawJson
+    
+    Bảng RawJson lưu giữ:
+    - Toàn bộ JSON gốc từ crawler
+    - Filename và timestamp
+    - Load status (SUCCESS/FAILED)
+    - Error message nếu có
+    
+    Mục đích:
+    - Audit trail - Trace back được dữ liệu gốc
+    - Debugging - Xem lại JSON khi có issue
+    - Reprocess - Load lại nếu cần
+    - Compliance - Giữ lại raw data theo quy định
+    
+    Logic mới:
+    - So sánh JSON mới với JSON cũ trong DB
+    - Chỉ insert items MỚI (chưa có video_id trong DB)
+    - Xóa items CŨ sau khi load thành công
+    """
     
     def __init__(self, db_conn: DatabaseConnection):
+        """Khởi tạo với database connection"""
+        self.db_conn = db_conn
+    
+    def fetch_existing_video_ids(self) -> Set[str]:
         """
-        Initialize raw json manager
+        Lấy tất cả video IDs đã có trong bảng RawJson
+        
+        Mục đích:
+        - So sánh với JSON mới để tìm items mới
+        - Tránh duplicate data
+        - Chỉ load data mới vào DB
+        
+        Returns:
+            Set[str]: Set chứa tất cả video IDs trong RawJson
+        """
+        try:
+            video_ids = set()
+            with self.db_conn.get_cursor() as cursor:
+                # Lấy tất cả raw JSON có status SUCCESS
+                cursor.execute("""
+                    SELECT content FROM RawJson 
+                    WHERE load_status = 'SUCCESS' AND content != ''
+                """)
+                results = cursor.fetchall()
+                
+                # Parse JSON và extract video IDs
+                for row in results:
+                    try:
+                        content = row[0]
+                        if content:
+                            json_data = json.loads(content)
+                            # JSON có thể là array hoặc single object
+                            if isinstance(json_data, list):
+                                for item in json_data:
+                                    if 'id' in item:
+                                        video_ids.add(item['id'])
+                            elif isinstance(json_data, dict) and 'id' in json_data:
+                                video_ids.add(json_data['id'])
+                    except json.JSONDecodeError:
+                        continue  # Skip invalid JSON
+                
+                logger.info(f"Fetched {len(video_ids)} existing video IDs from RawJson")
+                return video_ids
+        except Error as e:
+            logger.error(f"Error fetching existing video IDs: {e}")
+            return set()
+    
+    def delete_old_raw_json(self, video_ids_to_delete: Set[str]) -> bool:
+        """
+        Xóa các records cũ trong RawJson có chứa video IDs cần xóa
+        
+        Logic:
+        - Đọc từng record trong RawJson
+        - Parse JSON và check video IDs
+        - Xóa record nếu chứa video IDs cũ
         
         Args:
-            db_conn: Database connection instance
+            video_ids_to_delete: Set các video IDs cần xóa
+            
+        Returns:
+            bool: True nếu xóa thành công
         """
-        self.db_conn = db_conn
+        if not video_ids_to_delete:
+            logger.info("No old video IDs to delete")
+            return True
+        
+        try:
+            deleted_count = 0
+            with self.db_conn.get_cursor() as cursor:
+                # Lấy tất cả records
+                cursor.execute("""
+                    SELECT raw_json_id, content FROM RawJson 
+                    WHERE load_status = 'SUCCESS' AND content != ''
+                """)
+                results = cursor.fetchall()
+                
+                records_to_delete = []
+                
+                # Check từng record
+                for row in results:
+                    raw_json_id = row[0]
+                    content = row[1]
+                    try:
+                        json_data = json.loads(content)
+                        should_delete = False
+                        
+                        # Check nếu JSON chứa video IDs cần xóa
+                        if isinstance(json_data, list):
+                            for item in json_data:
+                                if 'id' in item and item['id'] in video_ids_to_delete:
+                                    should_delete = True
+                                    break
+                        elif isinstance(json_data, dict) and 'id' in json_data:
+                            if json_data['id'] in video_ids_to_delete:
+                                should_delete = True
+                        
+                        if should_delete:
+                            records_to_delete.append(raw_json_id)
+                    except json.JSONDecodeError:
+                        continue
+                
+                # Xóa records
+                if records_to_delete:
+                    placeholders = ','.join(['%s'] * len(records_to_delete))
+                    delete_query = f"DELETE FROM RawJson WHERE raw_json_id IN ({placeholders})"
+                    cursor.execute(delete_query, records_to_delete)
+                    deleted_count = cursor.rowcount
+                    self.db_conn.connection.commit()
+                    logger.info(f"Deleted {deleted_count} old records from RawJson")
+                else:
+                    logger.info("No records to delete")
+                
+                return True
+        except Error as e:
+            logger.error(f"Error deleting old raw JSON: {e}")
+            self.db_conn.connection.rollback()
+            return False
     
     def insert_raw_json(
         self,
@@ -213,7 +408,13 @@ class RawJsonManager:
         error_message: Optional[str] = None
     ) -> bool:
         """
-        Insert raw JSON record
+        Insert raw JSON record (CHỈ ITEMS MỚI)
+        
+        Logic mới:
+        1. Lấy tất cả video IDs đã có trong RawJson
+        2. Parse JSON mới và filter chỉ lấy items mới
+        3. Insert items mới vào RawJson
+        4. Xóa items cũ khỏi RawJson
         
         Args:
             content: Full JSON content
@@ -225,14 +426,77 @@ class RawJsonManager:
             bool: True if successful
         """
         try:
+            # Nếu status FAILED, insert nguyên xi không filter
+            if status == config.LOAD_STATUS_FAILED:
+                with self.db_conn.get_cursor() as cursor:
+                    cursor.execute(
+                        config.Queries.INSERT_RAW_JSON,
+                        (content, filename, status, error_message)
+                    )
+                    self.db_conn.connection.commit()
+                    logger.info(f"Inserted failed raw JSON record: {filename}")
+                    return True
+            
+            # === LOGIC MỚI: CHỈ INSERT ITEMS MỚI ===
+            
+            # 1. Lấy video IDs đã có trong DB
+            existing_video_ids = self.fetch_existing_video_ids()
+            logger.info(f"Found {len(existing_video_ids)} existing video IDs in RawJson")
+            
+            # 2. Parse JSON mới
+            try:
+                json_data = json.loads(content)
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON content: {e}")
+                return False
+            
+            # 3. Filter chỉ lấy items MỚI
+            new_items = []
+            old_video_ids = set()
+            
+            if isinstance(json_data, list):
+                for item in json_data:
+                    video_id = item.get('id')
+                    if video_id:
+                        if video_id not in existing_video_ids:
+                            new_items.append(item)  # Item MỚI
+                        else:
+                            old_video_ids.add(video_id)  # Item CŨ - đánh dấu để xóa
+            elif isinstance(json_data, dict):
+                video_id = json_data.get('id')
+                if video_id:
+                    if video_id not in existing_video_ids:
+                        new_items.append(json_data)
+                    else:
+                        old_video_ids.add(video_id)
+            
+            logger.info(f"Found {len(new_items)} NEW items, {len(old_video_ids)} OLD items")
+            
+            # 4. Nếu không có items mới, return
+            if not new_items:
+                logger.info("No new items to insert")
+                # Vẫn xóa items cũ nếu có
+                if old_video_ids:
+                    self.delete_old_raw_json(old_video_ids)
+                return True
+            
+            # 5. Insert items MỚI
+            new_content = json.dumps(new_items, ensure_ascii=False)
             with self.db_conn.get_cursor() as cursor:
                 cursor.execute(
                     config.Queries.INSERT_RAW_JSON,
-                    (content, filename, status, error_message)
+                    (new_content, filename, status, error_message)
                 )
                 self.db_conn.connection.commit()
-                logger.info(f"Inserted raw JSON record: {filename} ({status})")
-                return True
+                logger.info(f"Inserted {len(new_items)} NEW items into RawJson: {filename}")
+            
+            # 6. Xóa items CŨ
+            if old_video_ids:
+                self.delete_old_raw_json(old_video_ids)
+                logger.info(f"Deleted {len(old_video_ids)} OLD video IDs from RawJson")
+            
+            return True
+            
         except Error as e:
             logger.error(f"Error inserting raw JSON: {e}")
             self.db_conn.connection.rollback()
@@ -243,19 +507,34 @@ class RawJsonManager:
 # ============================================================================
 
 class UpsertManager:
-    """Manage upsert operations with SCD Type 2 logic"""
+    """
+    Class UpsertManager: Quản lý upsert operations với SCD Type 2 logic
+    
+    SCD Type 2 (Slowly Changing Dimension):
+    - Giữ track lịch sử thay đổi của dữ liệu
+    - Mỗi record có is_current flag
+    - Khi data thay đổi: UPDATE record hiện tại
+    
+    Logic upsert cho mỗi record:
+    1. Check ID có tồn tại trong existing_* Set không
+    2. Nếu CHƯA tồn tại → INSERT record mới
+    3. Nếu ĐÃ tồn tại:
+       a. So sánh data có thay đổi không
+       b. Nếu thay đổi → UPDATE record
+       c. Nếu không đổi → SKIP (tiết kiệm query)
+    
+    Returns cho mỗi operation:
+    - (True, "INSERT"): Insert thành công
+    - (True, "UPDATE"): Update thành công
+    - (True, "SKIP"): Không cần update
+    - (False, "ERROR"): Có lỗi xảy ra
+    """
     
     def __init__(self, db_conn: DatabaseConnection):
-        """
-        Initialize upsert manager
-        
-        Args:
-            db_conn: Database connection instance
-        """
+        """Khởi tạo với database connection"""
         self.db_conn = db_conn
     
-    def upsert_author(
-        self,
+    def upsert_author(self,
         author_id: str,
         author_name: str,
         avatar: str,
@@ -264,22 +543,43 @@ class UpsertManager:
         existing_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, str]:  # (success, action: INSERT/UPDATE/SKIP)
         """
-        Upsert author record (SCD Type 2)
+        Upsert author record với SCD Type 2 logic
+        
+        Flow diagram:
+        ```
+        author_id in existing_authors?
+                │
+           ┌────┼────┐
+           │         │
+          NO        YES
+           │         │
+           │    Check data changed?
+           │         │
+           │    ┌────┼────┐
+           │    │         │
+           │   YES        NO
+           │    │         │
+        INSERT UPDATE    SKIP
+        ```
         
         Args:
-            author_id: Author ID
-            author_name: Author name
+            author_id: Author ID (PK)
+            author_name: Tên author
             avatar: Avatar URL
-            date_sk: Date surrogate key
-            existing_authors: Set of existing author IDs
-            existing_data: Existing author data for comparison
+            date_sk: Date surrogate key (FK to DateDim)
+            existing_authors: Set các author_id đã có
+            existing_data: Data hiện tại (cho compare) - optional
             
         Returns:
-            Tuple of (success, action_taken)
+            Tuple (success: bool, action: str)
+            - (True, "INSERT"): Insert author mới
+            - (True, "UPDATE"): Update author cũ
+            - (True, "SKIP"): Không cần update
+            - (False, "ERROR"): Có lỗi
         """
         try:
             if author_id not in existing_authors:
-                # INSERT new author
+                # ===== CASE 1: INSERT NEW AUTHOR =====
                 with self.db_conn.get_cursor() as cursor:
                     cursor.execute(
                         config.Queries.INSERT_AUTHOR,
@@ -288,15 +588,16 @@ class UpsertManager:
                 self.db_conn.connection.commit()
                 return True, "INSERT"
             else:
-                # Author exists - check if data changed
+                # ===== CASE 2 & 3: AUTHOR ĐÃ TỒN TẠI =====
+                # Check data có thay đổi không
                 if existing_data and (
                     existing_data.get("author_name") == author_name and
                     existing_data.get("avatar") == avatar
                 ):
-                    # No change - SKIP
+                    # CASE 3: Data không đổi → SKIP
                     return True, "SKIP"
                 else:
-                    # Data changed - UPDATE
+                    # CASE 2: Data thay đổi → UPDATE
                     with self.db_conn.get_cursor() as cursor:
                         cursor.execute(
                             config.Queries.UPDATE_AUTHOR,
@@ -384,25 +685,37 @@ class UpsertManager:
         existing_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[bool, str]:
         """
-        Upsert video interaction record (SCD Type 2)
+        Upsert video interaction record với SCD Type 2 logic
+        
+        Đặc điểm:
+        - Interactions LUÔN LUÔN THAY ĐỔI (views, likes tăng liên tục)
+        - Cần update thường xuyên để tracking metrics
+        - SKIP chỉ khi TẤT CẢ 5 counts đều giống hệt (rất hiếm)
+        
+        5 metrics được track:
+        1. digg_count: Số likes
+        2. play_count: Số views
+        3. share_count: Số shares
+        4. comment_count: Số comments
+        5. collect_count: Số saves
         
         Args:
-            video_id: Video ID
-            digg_count: Like count
-            play_count: View count
-            share_count: Share count
-            comment_count: Comment count
-            collect_count: Save count
+            video_id: Video ID (FK to Videos)
+            digg_count: Số like
+            play_count: Số view
+            share_count: Số share
+            comment_count: Số comment
+            collect_count: Số save
             date_sk: Date surrogate key
-            existing_interactions: Set of video IDs with interactions
-            existing_data: Existing interaction data for comparison
+            existing_interactions: Set các video_id đã có interaction
+            existing_data: Data hiện tại (cho compare)
             
         Returns:
-            Tuple of (success, action_taken)
+            Tuple (success: bool, action: str)
         """
         try:
             if video_id not in existing_interactions:
-                # INSERT new interaction
+                # ===== INSERT NEW INTERACTION =====
                 with self.db_conn.get_cursor() as cursor:
                     cursor.execute(
                         config.Queries.INSERT_INTERACTION,
@@ -411,7 +724,7 @@ class UpsertManager:
                 self.db_conn.connection.commit()
                 return True, "INSERT"
             else:
-                # Interaction exists - check if counts changed
+                # ===== INTERACTION ĐÃ TỐN TẠI - CHECK COUNTS CHANGED =====
                 if existing_data and (
                     existing_data.get("digg_count") == digg_count and
                     existing_data.get("play_count") == play_count and
@@ -419,10 +732,10 @@ class UpsertManager:
                     existing_data.get("comment_count") == comment_count and
                     existing_data.get("collect_count") == collect_count
                 ):
-                    # No change - SKIP
+                    # Tất cả counts giống hệt → SKIP (rất hiếm)
                     return True, "SKIP"
                 else:
-                    # Data changed - UPDATE
+                    # Ít nhất 1 count thay đổi → UPDATE
                     with self.db_conn.get_cursor() as cursor:
                         cursor.execute(
                             config.Queries.UPDATE_INTERACTION,
@@ -440,15 +753,25 @@ class UpsertManager:
 # ============================================================================
 
 class LoadLogManager:
-    """Manage LoadLog table operations"""
+    """
+    Class LoadLogManager: Quản lý bảng LoadLog
+    
+    Bảng LoadLog ghi lại:
+    - Mỗi lần load vào staging table
+    - Statistics: inserted, updated, skipped, failed counts
+    - Thời gian xử lý (start, end, duration)
+    - Status: SUCCESS/FAILED/PARTIAL
+    - Source filename và batch_id
+    
+    Mục đích:
+    - Monitoring - Theo dõi quá trình load
+    - Troubleshooting - Debug khi có issue
+    - Reporting - Báo cáo số liệu load
+    - Audit - Compliance với quy định
+    """
     
     def __init__(self, db_conn: DatabaseConnection):
-        """
-        Initialize load log manager
-        
-        Args:
-            db_conn: Database connection instance
-        """
+        """Khởi tạo với database connection"""
         self.db_conn = db_conn
     
     def log_load(
@@ -466,25 +789,39 @@ class LoadLogManager:
         error_message: Optional[str] = None
     ) -> bool:
         """
-        Insert load log record
+        Insert load log record vào bảng LoadLog
+        
+        Gọi method này sau khi hoàn tất load một staging table
+        
+        Ví dụ log record:
+        - batch_id: "LOAD_20231129_123456"
+        - table_name: "Authors"
+        - record_count: 100 (tổng số records xử lý)
+        - inserted_count: 20 (records mới)
+        - updated_count: 15 (records cập nhật)
+        - skipped_count: 65 (records không đổi)
+        - status: "SUCCESS" hoặc "FAILED" hoặc "PARTIAL"
+        - duration_seconds: 16.5
+        - source_filename: "device-unknown_run_23112025T044106Z.json"
         
         Args:
-            batch_id: Batch identifier
-            table_name: Target table name
-            record_count: Total records processed
-            inserted_count: Records inserted
-            updated_count: Records updated
-            skipped_count: Records skipped
-            status: Load status (SUCCESS/FAILED/PARTIAL)
-            start_time: Start timestamp
-            end_time: End timestamp
-            source_filename: Source file name
-            error_message: Error details if any
+            batch_id: Batch identifier (LOAD_YYYYMMDD_HHMMSS)
+            table_name: Tên bảng đích (Authors/Videos/VideoInteractions)
+            record_count: Tổng số records xử lý
+            inserted_count: Số records INSERT
+            updated_count: Số records UPDATE
+            skipped_count: Số records SKIP
+            status: LOAD_STATUS_SUCCESS/FAILED/PARTIAL
+            start_time: Thời điểm bắt đầu
+            end_time: Thời điểm kết thúc
+            source_filename: Tên file JSON gốc
+            error_message: Thông tin lỗi nếu có
             
         Returns:
-            bool: True if successful
+            bool: True nếu log thành công
         """
         try:
+            # Tính duration từ start và end time
             duration_seconds = (end_time - start_time).total_seconds()
             
             with self.db_conn.get_cursor() as cursor:
@@ -513,15 +850,28 @@ class LoadLogManager:
 # ============================================================================
 
 class DateDimManager:
-    """Manage DateDim table operations"""
+    """
+    Class DateDimManager: Quản lý bảng DateDim (Date Dimension)
+    
+    Bảng DateDim chứa:
+    - Tất cả ngày từ 2005 đến tương lai
+    - 18 cột thông tin về mỗi ngày
+    - date_sk (PK) - Surrogate key dạng số
+    - full_date - Ngày đầy đủ (YYYY-MM-DD)
+    - Các thông tin khác: day_of_week, month, year, week, holiday...
+    
+    Mục đích:
+    - Chuẩn hóa date dimension trong data warehouse
+    - Cho phép join với các fact tables qua date_sk
+    - Hỗ trợ time-based analysis (weekly, monthly, yearly...)
+    
+    Operations:
+    - load_date_dim_from_csv(): Load từ CSV file
+    - load_date_dim_with_validation(): Load với validation chi tiết
+    """
     
     def __init__(self, db_conn: DatabaseConnection):
-        """
-        Initialize date dim manager
-        
-        Args:
-            db_conn: Database connection instance
-        """
+        """Khởi tạo với database connection"""
         self.db_conn = db_conn
     
     def load_date_dim_from_csv(self, csv_path: str) -> bool:
@@ -619,13 +969,49 @@ class DateDimManager:
     
     def load_date_dim_with_validation(self, csv_path: str) -> Tuple[bool, Dict[str, Any]]:
         """
-        Load DateDim from CSV with detailed validation and error handling
+        Load DateDim từ CSV với validation chi tiết và error handling
+        
+        Quá trình load:
+        1. Kiểm tra file CSV tồn tại
+        2. Đọc và validate từng dòng:
+           - Kiểm tra đủ 18 cột
+           - Validate date_sk là số
+           - Validate full_date format (YYYY-MM-DD)
+        3. Clear bảng DateDim (TRUNCATE)
+        4. Batch insert tất cả records hợp lệ
+        5. Trả về statistics chi tiết
+        
+        CSV Structure (18 columns):
+        1. date_sk - Surrogate key (PK)
+        2. full_date - YYYY-MM-DD
+        3. day_since_2005
+        4. month_since_2005
+        5. day_of_week - Monday, Tuesday...
+        6. calendar_month - January, February...
+        7. calendar_year - YYYY
+        8. calendar_year_month - YYYY-Mon
+        9. day_of_month - 1-31
+        10. day_of_year - 1-366
+        11. week_of_year_sunday
+        12. year_week_sunday
+        13. week_sunday_start
+        14. week_of_year_monday
+        15. year_week_monday
+        16. week_monday_start
+        17. holiday
+        18. day_type - Weekend/Weekday
         
         Args:
-            csv_path: Path to date_dim.csv file
+            csv_path: Đường dẫn đến file date_dim.csv
             
         Returns:
-            Tuple of (success: bool, stats: Dict with load statistics)
+            Tuple (success: bool, stats: Dict)
+            stats chứa:
+            - total_records: Tổng số dòng trong CSV
+            - loaded_records: Số records load thành công
+            - skipped_records: Số records bị skip (invalid)
+            - errors: List các error messages
+            - duration_seconds: Thời gian xử lý
         """
         stats = {
             "total_records": 0,

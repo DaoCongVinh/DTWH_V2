@@ -1,0 +1,2 @@
+# Chạy ETL lúc 10h sáng mỗi ngày
+0 10 * * * root bash /app/start_etl.sh >> /var/log/cron.log 2>&1
