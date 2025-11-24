@@ -1,7 +1,3 @@
-"""
-Configuration file for Loader Staging Service
-Manages environment variables and application constants
-"""
 
 import os
 from pathlib import Path

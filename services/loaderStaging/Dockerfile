@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY config.py .
 COPY db.py .
 COPY loader.py .
-COPY load_date_dim_cli.py .
+COPY transformer.py .
 COPY tiktok_schema.json .
 COPY date_dim.csv .
 COPY logging_setup.py .
@@ -30,8 +30,8 @@ RUN mkdir -p /app/logs
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Ho_Chi_Minh
 
-# Entrypoint script to load DateDim and then run loader
-RUN echo '#!/bin/bash\nset +e\necho "Waiting for MySQL..."\nwhile ! nc -z db 3306; do sleep 1; done\necho "MySQL is ready"\nsleep 2\necho "Loading DateDim..."\npython load_date_dim_cli.py 2>&1 | head -20\necho "DateDim load completed (or skipped if error)"\necho "Starting Loader..."\necho "======== LOADER STAGING START ========"\nexec python loader.py' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+# Entrypoint script to load DateDim and then run loader with scheduler
+RUN echo '#!/bin/bash\nset +e\necho "Waiting for MySQL..."\nwhile ! nc -z db 3306; do sleep 1; done\necho "MySQL is ready"\nsleep 2\necho "Loading DateDim..."\npython loader.py --load-date-dim --simple 2>&1 | head -20\necho "DateDim load completed (or skipped if error)"\necho "Starting Loader with Scheduler..."\necho "======== LOADER STAGING START ========"\nexec python loader.py --schedule' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Run entrypoint
 CMD ["/app/entrypoint.sh"]
