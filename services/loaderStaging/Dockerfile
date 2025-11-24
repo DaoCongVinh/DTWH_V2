@@ -21,6 +21,7 @@ COPY loader.py .
 COPY transformer.py .
 COPY tiktok_schema.json .
 COPY logging_setup.py .
+COPY ensure_date_dim.py .
 
 # Create log directory
 RUN mkdir -p /app/logs
@@ -29,6 +30,7 @@ RUN mkdir -p /app/logs
 ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Ho_Chi_Minh
 
+<<<<<<< HEAD
 # Create clean entrypoint script (no DateDim load)
 RUN cat << 'EOF' > /app/entrypoint.sh
 #!/bin/bash
@@ -47,3 +49,37 @@ EOF
 RUN chmod +x /app/entrypoint.sh
 
 CMD ["/app/entrypoint.sh"]
+=======
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "================================"\n\
+echo "LOADER STAGING STARTING"\n\
+echo "================================"\n\
+\n\
+# Wait for MySQL to be ready\n\
+echo "Waiting for MySQL..."\n\
+until nc -z db 3306; do\n\
+    echo "MySQL not ready, retrying..."\n\
+    sleep 2\n\
+done\n\
+echo "✓ MySQL is ready"\n\
+\n\
+# Additional wait for init scripts to complete\n\
+echo "Waiting for database initialization..."\n\
+sleep 5\n\
+\n\
+# Ensure DateDim is ready\n\
+echo "Ensuring DateDim is ready..."\n\
+python ensure_date_dim.py\n\
+\n\
+# Start the scheduler\n\
+echo ""\n\
+echo "================================"\n\
+echo "STARTING LOADER SCHEDULER"\n\
+echo "================================"\n\
+exec python loader.py --schedule\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+CMD ["/bin/bash", "/app/entrypoint.sh"]
+>>>>>>> 960b774e5043c7ec52283bd439b2ad5fcfd24c7e
