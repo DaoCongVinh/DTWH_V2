@@ -3,11 +3,13 @@ CREATE DATABASE IF NOT EXISTS staging_tiktok;
 CREATE DATABASE IF NOT EXISTS warehouse_tiktok;
 CREATE DATABASE IF NOT EXISTS dbStaging;
 CREATE DATABASE IF NOT EXISTS dwh_tiktok;
+CREATE DATABASE IF NOT EXISTS dbAgg;
 
 -- Create user and grant permissions
 CREATE USER IF NOT EXISTS 'user'@'%' IDENTIFIED BY 'dwhtiktok';
 GRANT ALL PRIVILEGES ON dwh_tiktok.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON dbStaging.* TO 'user'@'%';
+GRANT ALL PRIVILEGES ON dbAgg.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON metadata_tiktok.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON staging_tiktok.* TO 'user'@'%';
 GRANT ALL PRIVILEGES ON warehouse_tiktok.* TO 'user'@'%';
@@ -240,4 +242,37 @@ CREATE TABLE IF NOT EXISTS LoadLog (
     INDEX idx_table_name (table_name),
     INDEX idx_status (status),
     INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- Schema: dbAgg - Aggregation Database
+-- Purpose: Store aggregated data for reporting and analytics
+-- ============================================================================
+CREATE DATABASE IF NOT EXISTS dbAgg CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE dbAgg;
+
+-- Bảng tổng hợp hiệu suất theo tác giả
+CREATE TABLE IF NOT EXISTS agg_author_performance (
+    s_key VARCHAR(64) PRIMARY KEY,
+    authorID BIGINT,
+    authorName VARCHAR(255),
+    totalViews BIGINT,
+    totalLikes BIGINT,
+    totalComments BIGINT,
+    totalShares BIGINT,
+    totalVideos INT,
+    avgViewsPerVideo DECIMAL(10,2)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Bảng tổng hợp theo ngày
+CREATE TABLE IF NOT EXISTS agg_daily_performance (
+    s_key VARCHAR(64) PRIMARY KEY,
+    dateKey INT,
+    fullDate DATE,
+    dayName VARCHAR(32),
+    totalViews BIGINT,
+    totalLikes BIGINT,
+    totalComments BIGINT,
+    totalShares BIGINT,
+    totalVideos INT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
